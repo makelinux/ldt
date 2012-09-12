@@ -1,0 +1,50 @@
+#!/bin/bash -x
+
+set -o errtrace
+tracing=/sys/kernel/debug/tracing
+irq=0
+# irq=`grep ehci_hcd /proc/interrupts | cut -f1 -d:`
+
+tracing()
+{
+	sudo sh -c "cd $tracing; $1"
+}
+
+tracing_start()
+{
+	tracing "echo :mod:ldt > set_ftrace_filter"
+	tracing "echo function > current_tracer"
+	tracing "echo 1 > function_profile_enabled"
+	sudo cat $tracing/current_tracer
+	sudo cat $tracing/set_ftrace_filter
+	sudo cat $tracing/function_profile_enabled
+}
+
+traccing_stop()
+{
+	tracing "cat trace_stat/function*"
+	tracing "echo 0 > function_profile_enabled"
+	tracing "echo nop > current_tracer"
+	sudo cp $tracing/trace .
+}
+
+# sudo rmmod parport_pc parport  ppdev lp
+sudo rmmod ldt
+set -o errexit
+make
+sudo insmod ldt.ko irq=$irq
+tracing_start
+lsmod  | grep ldt
+id=`grep -w ldt /proc/misc | cut -c -3`
+sudo sh -c "rm /dev/ldt;sudo mknod /dev/ldt c 10 $id; chmod o+rw /dev/ldt"
+echo 123 > /dev/ldt
+head -n 1 /dev/ldt
+sleep 0.5
+head -n 1 /dev/ldt
+grep ldt /proc/interrupts || true
+echo Profiling data per CPU
+traccing_stop
+sudo rmmod ldt
+#sudo dmesg --show-delta --notime --read-clear > kernel.log
+sudo dmesg -c > kernel.log
+#sudo dmesg --show-delta --notime --read-clear > kernel.log
