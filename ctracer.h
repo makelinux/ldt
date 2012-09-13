@@ -1,55 +1,47 @@
+/*
+	Tracing utility for C
+
+	implemented in include-file only
+
+	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
+
+	Dual BSD/GPL License
+*/
+
+/* Configuration flags: */
+
 //#define TRACE_TIME
+//#define TRACE_MALLOC
+
+
+/*
+	VI comand to include label _entry to each function start for tracing
+	:%s/) *\n{ *$/)\r{\t_entry:;/
+ */
+
 #ifndef __ASSEMBLY__
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
-// This file contains simple and usefull tracing fuctions.
-// It intended to be cross platform, easy to include to
-// any another source for tracing.
-// To use this file just include it. No need more
-// changes in compilation or linkage.
-//
-// by Conan, Constantine Shulyupin
+#ifndef CTRACER_H_INCLUDED
+#define CTRACER_H_INCLUDED
 
-// allow multiple inclussion with differen flag (TRACE_OFF)
-//#ifndef _TRACE_H_
-#ifndef _TRACE_H_
-// First time
-#define _TRACE_H_
 typedef int status_t;
 extern __thread status_t status;
 
-// comands:
-// :%s/) *\n{ *$/)\r{\t_entry:;/
-
-#define FNSTART trllog()
 #define _entry trllog(); goto _entry; _entry
 //#define _entry _trace_enter_exit_();trln(); goto _entry_second;_entry_second
 //#define _entry once(trl()); goto _entry; _entry
 //#define return trlm("} "); return
-//#define FNSTART trl()
-#define DEBUG_PRINT tracef
-#define FNSTARTP(args...) trllog(args)
-//#define _MMREAD32(mac,address) gbus_read_uint32 (mac,(RMuint32)(address))
-//#define _MMREADFIELD(mac,structaddress,field) (_MMREAD32(mac,(RMuint8 *)(&(structaddress)->field)))
 
 #ifdef TRACE_MALLOC
 static int malloc_count=0;
 static void * malloc_trace=NULL;
 #endif
-//static inline int empty_statement() {return 0;};
-//#define  empty_statement() do {(0);} while (0) // for sdcc
 #define empty_statement() do { } while (0)
 #define empty_function()  { } while (0)
-//#define empty_statement (1+1)
-
-#else
-// Second time
-  #undef IFDBG
-  #undef tracef
-#endif
 
 #define trace_ioctl(nr) tracef("ioctl=(%c%c %c #%i %ib)\n", \
 	(_IOC_READ & _IOC_DIR(nr))?'r':' ', (_IOC_WRITE & _IOC_DIR(nr))?'w':' ', \
@@ -57,29 +49,17 @@ static void * malloc_trace=NULL;
 
 #define trace_ioctl_(nr) tracef("ioctl=(%i %i %i %i)", _IOC_DIR(nr),_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
 
-#ifdef DEBUG // default if debug
+#ifdef DEBUG
 #define _TRACE
 #endif
 
-#ifdef CTRACER_ON // like debug
+#ifdef CTRACER_ON
 #define _TRACE
-#endif
-
-#ifdef TRACE_ON // like debug
-#define _TRACE
-#endif
-
-#ifndef TRACE_OFF
-//#define _TRACE // trace by default
 #endif
 
 #ifdef CTRACER_OFF // force no tracing
 #undef _TRACE
 #endif
-
-//#define _TRACE // global force
-//#undef _TRACE // for cvs
-//#error
 
 #ifdef _TRACE
 #define IFDBG(x) x
@@ -104,8 +84,6 @@ free_pages_prev = zone_table[0]->free_pages; \
 #endif
 
 //#define tracef(fmt, args...) { if (get_current()->trace) printk( fmt, ## args); }
-//extern int printk(const char *s, ...);
-//#define tracef(fmt, args...) printk(KERN_DEBUG fmt, ##args)
 #define SOL KERN_DEBUG
 #define tracef(fmt, args...) printk(fmt, ##args)
 
@@ -114,10 +92,6 @@ free_pages_prev = zone_table[0]->free_pages; \
 #include <stdio.h>
 
 #ifdef __GNUC__
-// this will work with gcc, and not with vcc
-// beacause vcc preprocessor hasn't '...'
-// Usefull: __unix__, __GNUC__, __GLIBC__, __linux__
-
 #define tracef(args...) fprintf(stderr,##args)
 
 //#include <signal.h>
@@ -131,8 +105,6 @@ free_pages_prev = zone_table[0]->free_pages; \
 #endif
 
 #endif // __KERNEL__
-
-#define trfn(i) trvi(i)
 
 #ifndef _hweight16_defined
 #ifdef __GNUC__
@@ -179,22 +151,13 @@ do {  \
 	}	num++; 				\
 } while (0)
 
-#else // ! _TRACE
+#else	// ! _TRACE
 #define trllog(args ... )
-#define trfn(i) (i)
 
 #define IFDBG(x) do {} while (0)
 #define trace_linux_mem() empty_statement()
-#ifdef WIN32
-#define tracef if (0) printf  // no print
-#else
-// for gcc
 #define tracef(fmt, args...) empty_function()
-#endif
-
 #define stack_trace() empty_statement()
-
-#define trfn(i) (i)
 
 #endif // _TARCE
 
@@ -204,13 +167,12 @@ do {  \
 #define EOL "\n" // for console
 //#define EOL "\r\n" // for com port
 
-// trace variables, integer, hex, string, pointer
+// trace variables: integer, hex, string, pointer, float, time value, with and w/o new line
 #ifndef trl
 #define trvi_(i) tracef(#i" = %i ",(int)i)
 #define trvi(i) tracef(#i" = %i"EOL,(int)i)
 #define trvx_(x) tracef(#x" = 0x%x ",(int)x)
 #define trvx(x) tracef(#x" = 0x%x"EOL,(int)x)
-//#define trvx(x) tracef(#x" = %#x"EOL,(int)x)
 #define trvlx(x) tracef(#x" = %#llx"EOL,(int)x)
 #define trvX(x) tracef(#x" = %#X"EOL,(int)x)
 #define trvf(f) tracef(#f" = %f"EOL,f)
@@ -234,21 +196,8 @@ do {  \
 #define trlvpx(p,x) tracef(SOL"%s:%i %s "#p" = 0x%p "#x" = %x"EOL,__FILE__,__LINE__,__FUNCTION__,p,(int)x)
 
 #endif
-/*
-not copliled in windows
-static inline void show_stack(int a)
-{
-	void * sp = &a;
-	trvp(sp);
-}
-*/
 
-#ifdef WIN32
-#define trla tracef
-#else
-// for gcc
 #define trla(fmt, args...) tracef("%s:%i %s "fmt,__FILE__,__LINE__,__FUNCTION__, ## args)
-#endif
 #ifdef MODULE
 static inline char * ctracer_file_name_no_path(char * fn)
 {
@@ -259,7 +208,6 @@ static inline char * ctracer_file_name_no_path(char * fn)
 	return fn;
 }
 #define __file__	ctracer_file_name_no_path(__FILE__)
-//#define __file__	KBUILD_MODNAME
 #else
 #define __file__	__FILE__
 #endif
@@ -268,7 +216,6 @@ static inline char * ctracer_file_name_no_path(char * fn)
 #define trf(m) tracef("%s",__FUNCTION__)
 #define trf_(m) tracef("%s ",__FUNCTION__)
 // macro with '_' doesn't prints new line
-//#define trlm_(m) tracef("%s:%i %s %s ",__FILE__,__LINE__,__FUNCTION__,m)
 #define trlm_(m) tracef(SOL"%s:%i %s %s ",__file__,__LINE__,__FUNCTION__,m)
 
 #ifndef trl
@@ -280,16 +227,9 @@ static inline char * ctracer_file_name_no_path(char * fn)
 #define trl_() do { trace_time(); trlm_(""); } while (0)
 #endif
 
-
-//#define trl_in() {trlm("{");IFDBG(stack_trace());}
 #define trl_in() trace_time();trlm("{");
 #define trl_out() trace_time();trlm("}");
 
-#if 0
-#define TraceMem(P,N) \
-	 IFDBG( { char * i=(signed char*)P; for (; ((int)i-(int)P) < N ; i++) \
-{ tracef("%i:%02X ",(int)i-(int)P,*(unsigned char*)i);};tracef(EOL); } )
-#else
 #define trace_mem(P,N) \
 	 IFDBG( { int i=0; tracef("%s=",#P); for (; i < (int)(N) ; i++) \
 { if (i && ( ! ( i % 16 ))) tracef("%i:",i); \
@@ -309,23 +249,6 @@ IFDBG( { int i=0; for (; i < (int)(N) ; i+= sizeof(int)) \
 tracef("%x ",*(int*)((void*)(P)+i)); \
 if (! ( (i+1) % 64 )) tracef(EOL); \
 };tracef(EOL); } )
-#endif
-
-#define TraceError(m) \
-	IFDBG( tracef("%s:%i %s %s"EOL,__FILE__,__LINE__,m,\
-	SysErrorMsgGet(GetLastError())) )
-
-//#ifdef DEBUG
-// TODO BUG: double call
-//#define TraceExpX(V) (TraceVarX(V),(V))
-//#define TraceRetStatus(R) { printf("%s:%i %s <= %s\n",__FILE__,__LINE__ ,SysErrorMsgGet(R),#R); }
-//#else
-//#define TraceExpX(V) (V)
-//#define TraceRetStatus(R) {R;}
-//#endif
-
-//##if DEBUG
-//#define LOG_ERR_I(f,i) print
 
 #ifdef TRACE_MALLOC
 
@@ -346,13 +269,8 @@ if (! ( (i+1) % 64 )) tracef(EOL); \
 #include <time.h>
 #include <sys/time.h>
 
-
 #ifndef trace_time_defined
 #define trace_time_defined
-//double time_prev_f = 0;
-//static double time_prev_f __attribute__ ((weak));
-//extern double time_prev_f __attribute__ ((weak));
-
 
 void trace_time();
 /*
@@ -390,12 +308,6 @@ void static inline trace_time()
 #define trace_time() empty_statement()
 #endif
 
-#ifdef free
-#undef free
-#undef char
-#undef int
-#endif
-
 #ifdef __GLIBC__XX
 #include <execinfo.h>
 #include <stdio.h>
@@ -427,19 +339,6 @@ static inline void stack_trace(void)
 #endif
 #endif // __GLIBC__
 
-//#ifndef ERR
-//#define ERR(x) ((x)<0)
-//#define OK(x) ((x)>=0)
-//#endif
-
-#define chck(F) do { int s=F; if (ERR(s)) { trl_();tracef(SOL"FAIL: %i="#F"\n",s); } } while (0)
-//#endif //  _TRACE_H_
-//##undef DEBUG
-
-//#ifdef define_freeram
-
-//int extern freeram();
-
 //#include <linux/kernel.h>
 //#include <linux/mm.h>
 //#include <asm/bitops.h>
@@ -462,13 +361,11 @@ static inline void stack_trace(void)
 	return i.freeram << 2 ; // K
 } */
 #include <linux/kernel.h>
-//#include <linux/printk.h>
 
 #define freeram() { struct sysinfo i; static unsigned int last; si_meminfo(&i); trl_(); \
 	int d = last-i.freeram; int used = i.totalram-i.freeram; \
 	trvi_(i.freeram);trvi_(used);  trvi(d); \
 	last = i.freeram; }
-//#endif
 
 #ifdef  __cplusplus
 }
@@ -506,6 +403,7 @@ static inline void _func_exit(void * l)
 }
 
 #define _trace_enter_exit_() char const *_location __attribute__ (( cleanup (_func_exit) )) = __func__; \
-	tracef("%s {",_location);
+	tracef("%s { ",_location);
 
-#endif // __ASSEMBLY__
+#endif	// CTRACER_H_INCLUDED
+#endif	// __ASSEMBLY__
