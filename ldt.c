@@ -21,7 +21,6 @@
  */
 
 
-#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
@@ -32,6 +31,7 @@
 #include <asm/io.h>
 #include <linux/kfifo.h>
 #include <linux/proc_fs.h>
+#include <linux/module.h>
 
 int irq = 0;
 module_param(irq, int, 0);
@@ -197,22 +197,23 @@ int ldt_init(void)
 {
 	int ret = 0;
 _entry:;
-	print_context();
-	ret = check(misc_register(&ldt_dev));
-	if (ret < 0)
-		goto exit;
-	trvd(ldt_dev.minor);
-	trl_();
-	trvd(irq);
-	isr_counter = 0;
-	if (irq) {
-		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
-	}
-	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
-	trvd(ret);
-	mod_timer(&ldt_timer, jiffies + HZ / 10);
+       print_context();
+       ret = check(misc_register(&ldt_dev));
+       if (ret < 0)
+	       goto exit;
+       trvd(ldt_dev.minor);
+       trl_();
+       trvd(irq);
+       trvs(KBUILD_MODNAME);
+       isr_counter = 0;
+       if (irq) {
+	       ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
+       }
+       proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
+       mod_timer(&ldt_timer, jiffies + HZ / 10);
 exit:
-	return ret;
+       trvd(ret);
+       return ret;
 }
 
 void ldt_exit(void)
