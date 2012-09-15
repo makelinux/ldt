@@ -8,7 +8,7 @@ obj-m+= ldt_plat_dev.o # implements platform_device and resource
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
-all:	mapper modules
+all:	modules
 
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules
