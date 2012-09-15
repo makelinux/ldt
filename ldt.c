@@ -21,17 +21,17 @@
  *	platform_driver and platform_device in another module
  */
 
+#include <asm/io.h>
+#include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
-#include <linux/mm.h>
-#include <linux/fs.h>
-#include <linux/miscdevice.h>
-#include <asm/io.h>
 #include <linux/kfifo.h>
+#include <linux/fs.h>
 #include <linux/proc_fs.h>
 #include <linux/module.h>
+#include <linux/miscdevice.h>
 #include <linux/platform_device.h>
 
 int irq = 0;
