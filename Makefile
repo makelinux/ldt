@@ -1,9 +1,14 @@
-ccflags-y+=-Wfatal-errors
+#ccflags-y+=-Wfatal-errors
 ccflags-y+=-include $M/ctracer.h
 ccflags-y+=-D CTRACER_ON
-obj-m:= ldt.o
+ccflags-y+=-D USE_PLATFORM_DEVICE
+obj-m+= ldt.o
+obj-m+= ldt_plat_drv.o # implements platform_driver only
+obj-m+= ldt_plat_dev.o # implements platform_device and resource
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+
+all:	mapper modules
 
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules
