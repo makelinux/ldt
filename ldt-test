@@ -1,8 +1,20 @@
-#!/bin/bash -x
+#!/bin/bash
+
+#	LDT - Linux Driver Template
+#
+#	Test script
+#
+#	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
+#
+#	Dual BSD/GPL License
+
+RED="\\033[0;31m"
+NOCOLOR="\\033[0;39m"
+GREEN="\\033[0;32m"
 
 set -o errtrace
 tracing=/sys/kernel/debug/tracing
-irq=0
+irq=0	# define irq to bind diriver to HW IRQ, WARING: can hung the system
 # irq=`grep ehci_hcd /proc/interrupts | cut -f1 -d:`
 
 tracing()
@@ -15,15 +27,15 @@ tracing_start()
 	tracing "echo :mod:ldt > set_ftrace_filter"
 	tracing "echo function > current_tracer"
 	tracing "echo 1 > function_profile_enabled"
-	sudo cat $tracing/current_tracer
-	sudo cat $tracing/set_ftrace_filter
-	sudo cat $tracing/function_profile_enabled
+	#sudo cat $tracing/current_tracer
+	#sudo cat $tracing/set_ftrace_filter
+	#sudo cat $tracing/function_profile_enabled
 }
 
 tracing_stop()
 {
-	echo Profiling data per CPU
-	tracing "cat trace_stat/function*"
+	( echo Profiling data per CPU
+	tracing "cat trace_stat/function*" )> trace_stat && echo trace_stat saved
 	tracing "echo 0 > function_profile_enabled"
 	tracing "echo nop > current_tracer"
 	sudo cp $tracing/trace ftrace.log && echo ftrace.log saved
@@ -32,17 +44,24 @@ tracing_stop()
 # sudo rmmod parport_pc parport  ppdev lp
 sudo rmmod ldt ldt_plat_dev
 set -o errexit
-make
+make -s
 sudo insmod ldt.ko irq=$irq
 sudo insmod ldt_plat_dev.ko
 
 tracing_start || true
-lsmod  | grep ldt
+# lsmod  | grep ldt
 id=`grep -w ldt /proc/misc | cut -c -3`
 sudo sh -c "rm /dev/ldt;sudo mknod /dev/ldt c 10 $id; chmod o+rw /dev/ldt"
-echo 123 > /dev/ldt
+data=123
+echo $data > /dev/ldt
 sleep 0.5
-head -n 1 /dev/ldt
+received=`head -n 1 /dev/ldt`
+if [ "$data" == "$received" ]; then
+echo -e "${GREEN}LDT test passed$NOCOLOR"
+else
+echo -e "${RED}LDT test failed$NOCOLOR"
+fi
+
 grep ldt /proc/interrupts || true
 tracing_stop || true
 #sudo dmesg --show-delta --notime --read-clear > kernel.log
