@@ -42,7 +42,7 @@ tracing_stop()
 }
 
 # sudo rmmod parport_pc parport  ppdev lp
-sudo rmmod ldt ldt_plat_dev
+sudo rmmod ldt ldt_plat_dev 2> /dev/null
 set -o errexit
 make -s
 sudo insmod ldt.ko irq=$irq

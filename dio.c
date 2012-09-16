@@ -37,38 +37,44 @@ static enum io_type {
 
 static void *inbuf, * outbuf;
 static void *mm;
-int buf_size = 8 * PAGE_SIZE;
+static int buf_size = 16 * 1024;
 static int mmapoffset;
-static int mmapsize;
+static int mmapsize = 16 * 1024;
 static char *dev_name;
 static int ignore_eof;
 
 int output(int dev, void *buf, int len)
 {
+	int ret = 0;
 	if ( dev < 0 )
 		return 0;
 	switch (io_type) {
 	case mmap_io:
+		memcpy(mm,buf,len);
+		ret = len;
 		break;
 	case file_io:
 	default:
-		len = write(dev, buf, len);
+		ret = write(dev, buf, len);
 	}
-	return len;
+	return ret;
 }
 
 int input(int dev, void *buf, int len)
 {
+	int ret;
 	if ( dev < 0 )
 		return 0;
 	switch (io_type) {
 	case mmap_io:
+		memcpy(buf,mm,len);
+		ret = len;
 		break;
 	case file_io:
 	default:
-		len = read(dev, buf, len);
+		ret = read(dev, buf, len);
 	}
-	return len;
+	return ret;
 }
 
 int pipe_start(int dev)
@@ -265,9 +271,10 @@ int main(int argc, char *argv[])
 	chkne(dev = open(dev_name, O_CREAT | O_RDWR,0666));
 	trvd(dev);
 	if (io_type == mmap_io) {
-		mm = mmap(0, mmapsize, PROT_READ | PROT_WRITE, MAP_FILE | MAP_SHARED, dev, mmapoffset);
+		mm = mmap(NULL, mmapsize, PROT_READ | PROT_WRITE, MAP_SHARED, dev, mmapoffset);
 		if (mm == MAP_FAILED) {
 			fprintf(stderr, "mmap() failed\n");
+			trvs(strerror(errno));
 			goto exit;
 		}
 	}
