@@ -57,9 +57,18 @@ echo $data > /dev/ldt
 sleep 0.5
 received=`head -n 1 /dev/ldt`
 if [ "$data" == "$received" ]; then
-echo -e "${GREEN}LDT test passed$NOCOLOR"
+echo -e "${GREEN}LDT read/write test passed$NOCOLOR"
 else
-echo -e "${RED}LDT test failed$NOCOLOR"
+echo -e "${RED}LDT read/write test failed$NOCOLOR"
+fi
+
+received=`sudo echo $data | ./dio --mmap /dev/ldt`
+if [ "$data" == "$received" ]; then
+echo -e "${GREEN}LDT mmap test passed$NOCOLOR"
+else
+echo -e "${RED}LDT mmap test failed$NOCOLOR"
+echo expected $data
+echo received $received
 fi
 
 grep ldt /proc/interrupts || true
