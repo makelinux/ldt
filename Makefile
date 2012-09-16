@@ -8,7 +8,7 @@ obj-m+= ldt_plat_dev.o # implements platform_device and resource
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
-all:	modules
+all:	modules dio
 
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules
@@ -21,6 +21,9 @@ clean:
 
 depend .depend dep:
 	$(CC) $(ccflags-y) -M *.c > .depend
+
+
+dio: CPPFLAGS+= -D CTRACER_ON -include ctracer.h -g
 
 ifeq (.depend,$(wildcard .depend))
 include .depend
