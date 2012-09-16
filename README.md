@@ -1,17 +1,23 @@
-LDT - Linux Driver Template
-===
+# LDT - Linux Driver Template
 
-Files:
-=====
 
-ldt.c - main source file of LDT
+## Files:
 
-ldt-test - test script, run it
 
-Usage:
-=====
+Main source file of LDT: 
+**[ldt.c](https://github.com/makelinux/ldt/blob/master/ldt.c)**
 
-Compilted and tested on Linux versions:
+Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/ldt-test)**
+
+## Usage:
+
+Just run
+
+git clone git://github.com/makelinux/ldt.git && cd ldt && ./ldt-test
+
+and explore sources
+
+## Compilted and tested on Linux versions:
 
 v3.6-rc5 
 
@@ -23,7 +29,6 @@ v2.6.37-rc8
 
 v2.6.36-rc8
 
-Failed compilation with:
-====
+### Failed compilation with:
 
 v2.6.35-rc6 failed because of DEFINE_FIFO
