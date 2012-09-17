@@ -9,7 +9,10 @@
  *	The driver demonstrates usage of following Linux facilities:
  *
  *	Linux kernel module
- *	file_operations read and write
+ *	file_operations 
+ *		read and write
+ *		mmap
+ *		ioctl
  *	kfifo
  *	completion
  *	interrupt
@@ -35,8 +38,8 @@
 #include <linux/platform_device.h>
 
 static int bufsize = PFN_ALIGN(16 * 1024);
-static void * in_buf;
-static void * out_buf;
+static void *in_buf;
+static void *out_buf;
 
 int irq = 0;
 module_param(irq, int, 0);
@@ -177,7 +180,7 @@ static ssize_t ldt_write(struct file *file, const char __user * buf, size_t coun
 	int ret;
 	unsigned int copied;
 _entry:
-
+	// TODO: implement blocking I/O
 	if (mutex_lock_interruptible(&write_lock))
 		return -EINTR;
 	ret = kfifo_from_user(&out_fifo, buf, count, &copied);
@@ -185,44 +188,64 @@ _entry:
 	return ret ? ret : copied;
 }
 
-void pages_set_reserved(struct page * page, int pages)
+void pages_set_reserved(struct page *page, int pages)
 {
 	for (; pages; pages--, page++)
 		SetPageReserved(page);
 }
-
 
 /*	pages_flag - set or clear a flag for sequence of pages
  *   
  *	more generic soultion instead SetPageReserved, ClearPageReserved etc
  */
 
-void pages_flag(struct page * page, int pages, int mask, int value)
+void pages_flag(struct page *page, int pages, int mask, int value)
 {
 	for (; pages; pages--, page++)
 		if (value)
 			__set_bit(mask, &page->flags);
 		else
-			__clear_bit(mask, &page->flags); 
+			__clear_bit(mask, &page->flags);
 
 }
 
 static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-       void * buf;
+	void *buf;
 _entry:
-       if (vma->vm_flags & VM_WRITE)
-	       buf = in_buf;
-       else if (vma->vm_flags & VM_READ)
-	       buf = out_buf;
+	if (vma->vm_flags & VM_WRITE)
+		buf = in_buf;
+	else if (vma->vm_flags & VM_READ)
+		buf = out_buf;
 
-       //vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);     // PAGE_SHARED
-       if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(in_buf) >> PAGE_SHIFT,
-			       vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
-	       trlm("remap_pfn_range failed");
-	       return -EAGAIN;
-       }
-       return 0;
+	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(in_buf) >> PAGE_SHIFT,
+			    vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
+		trlm("remap_pfn_range failed");
+		return -EAGAIN;
+	}
+	return 0;
+}
+
+long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
+{
+	void __user *user = (void *)arg;
+_entry:
+	trl_();
+	trvx_(cmnd);
+	trvx_(_IOC_DIR(cmnd));
+	trvx(arg);
+	// TODO: manage data and poll
+	trace_ioctl(cmnd);
+	if (_IOC_DIR(cmnd) == _IOC_WRITE) {
+		copy_from_user(in_buf, user, _IOC_SIZE(cmnd));
+		memcpy(out_buf, in_buf, bufsize);
+		memset(in_buf, 0, bufsize);
+	}
+	if (_IOC_DIR(cmnd) == _IOC_READ) {
+		copy_to_user(user, out_buf, _IOC_SIZE(cmnd));
+		memset(out_buf, 0, bufsize);
+	}
+	return 0;
 }
 
 struct file_operations ldt_fops = {
@@ -232,7 +255,8 @@ struct file_operations ldt_fops = {
 	.read = ldt_read,
 	.write = ldt_write,
 	.mmap = ldt_mmap,
-	.poll = NULL,
+	.unlocked_ioctl = ldt_ioctl,
+	.poll = NULL,		// TODO
 };
 
 static struct miscdevice ldt_miscdev = {
@@ -254,16 +278,16 @@ _entry:
 	trvd_(irq);
 	trvd_(bufsize);
 	trln();
-	if (!( in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO) )) { 
-		ret = - ENOMEM;
+	if (!(in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO))) {
+		ret = -ENOMEM;
 		goto exit;
 	}
-	pages_flag(virt_to_page(in_buf), PFN_UP(bufsize), PG_reserved,1);
-	if (!( out_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO) )) { 
-		ret = - ENOMEM;
+	pages_flag(virt_to_page(in_buf), PFN_UP(bufsize), PG_reserved, 1);
+	if (!(out_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO))) {
+		ret = -ENOMEM;
 		goto exit;
 	}
-	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved,1);
+	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
 	//ret = register_chrdev (0, KBUILD_MODNAME, &ldt_fops);
 	if (pdev) {
 		data = pdev->dev.platform_data;
@@ -301,11 +325,11 @@ _entry:
 		free_irq(irq, THIS_MODULE);
 	}
 	if (in_buf) {
-		pages_flag(virt_to_page(in_buf), PFN_UP(bufsize), PG_reserved,0);
+		pages_flag(virt_to_page(in_buf), PFN_UP(bufsize), PG_reserved, 0);
 		free_pages_exact(in_buf, bufsize);
 	}
 	if (out_buf) {
-		pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved,0);
+		pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 0);
 		free_pages_exact(out_buf, bufsize);
 	}
 	trvd(isr_counter);
@@ -331,7 +355,7 @@ module_platform_driver(ldt_driver);
 #else
 
 /*
- *	for releases before v3.1-12 without macro module_platform_driver
+ *	for Linux kernel releases before v3.1-12 without macro module_platform_driver
  */
 
 static int ldt_init(void)

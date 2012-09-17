@@ -35,7 +35,7 @@ tracing_start()
 tracing_stop()
 {
 	( echo Profiling data per CPU
-	tracing "cat trace_stat/function*" )> trace_stat && echo trace_stat saved
+	tracing "cat trace_stat/function*" )> trace_stat.log && echo trace_stat.log saved
 	tracing "echo 0 > function_profile_enabled"
 	tracing "echo nop > current_tracer"
 	sudo cp $tracing/trace ftrace.log && echo ftrace.log saved
@@ -52,7 +52,7 @@ tracing_start || true
 # lsmod  | grep ldt
 id=`grep -w ldt /proc/misc | cut -c -3`
 sudo sh -c "rm /dev/ldt;sudo mknod /dev/ldt c 10 $id; chmod o+rw /dev/ldt"
-data=123
+data=123rw
 echo $data > /dev/ldt
 sleep 0.5
 received=`head -n 1 /dev/ldt`
@@ -62,6 +62,7 @@ else
 echo -e "${RED}LDT read/write test failed$NOCOLOR"
 fi
 
+data=123mmap
 received=`sudo echo $data | ./dio --mmap /dev/ldt`
 if [ "$data" == "$received" ]; then
 echo -e "${GREEN}LDT mmap test passed$NOCOLOR"
@@ -71,8 +72,17 @@ echo expected $data
 echo received $received
 fi
 
+data=123ioctl
+received=`sudo echo $data | ./dio --ioctl /dev/ldt`
+if [ "$data" == "$received" ]; then
+echo -e "${GREEN}LDT ioctl test passed$NOCOLOR"
+else
+echo -e "${RED}LDT ioctl test failed$NOCOLOR"
+echo expected $data
+echo received $received
+fi
+
 grep ldt /proc/interrupts || true
 tracing_stop || true
-#sudo dmesg --show-delta --notime --read-clear > kernel.log
+sudo dmesg --show-delta --notime --read-clear 2>/dev/null > kernel.log || \
 sudo dmesg -c > kernel.log && echo kernel.log saved
-#sudo dmesg --show-delta --notime --read-clear > kernel.log
