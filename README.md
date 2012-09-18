@@ -12,6 +12,8 @@ Main source file of LDT:
 
 Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/ldt-test)**
 
+Browse the rest code: https://github.com/makelinux/ldt/
+
 ## Usage:
 
 Just run
