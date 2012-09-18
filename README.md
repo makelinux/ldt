@@ -21,7 +21,7 @@ git clone git://github.com/makelinux/ldt.git && cd ldt && ./ldt-test
 
 and explore sources
 
-## Compilted and tested on Linux versions:
+## Compiled and tested on Linux versions:
 
 v3.6-rc5 
 

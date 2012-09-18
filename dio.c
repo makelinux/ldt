@@ -226,8 +226,9 @@ int expand_arg(char *arg)
 	return strtol(arg, NULL, 0);
 }
 
-char *usage = "Usage:\n\
-       devio <options> <device file>\n\
+char *usage = "dio - Device Input/Output utility\n\
+Usage:\n\
+       dio <options> <device file>\n\
 \n\
 options:\n\
 \n\
