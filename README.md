@@ -2,7 +2,7 @@
 
 It is useful for Linux driver development beginners and as starting point for a new drivers. 
 The driver uses following Linux facilities: 
-module, file_operations (read/write, mmap, ioctl), kfifo, completion, interrupt, tasklet, work, timer, misc device, proc fs. 
+module, file_operations (read/write, mmap, ioctl, blocking and nonblocking mode), kfifo, completion, interrupt, tasklet, work, timer, misc device, proc fs. 
 
 ## Files:
 

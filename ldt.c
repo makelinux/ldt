@@ -9,12 +9,13 @@
  *	The driver demonstrates usage of following Linux facilities:
  *
  *	Linux kernel module
- *	file_operations 
+ *	file_operations
  *		read and write
+ *		blocking read
  *		mmap
  *		ioctl
  *	kfifo
- *	completion
+ *	completion TODO
  *	interrupt
  *	tasklet
  *	work
@@ -62,6 +63,8 @@ static int ldt_work_counter;
 static DEFINE_KFIFO(in_fifo, char, FIFO_SIZE);
 static DEFINE_KFIFO(out_fifo, char, FIFO_SIZE);
 
+static DECLARE_WAIT_QUEUE_HEAD(in_fifo_has_data);
+
 spinlock_t fifo_lock;
 
 /*	ldt_received - called with data received from HW port
@@ -70,9 +73,10 @@ spinlock_t fifo_lock;
 void ldt_received(void *data, int size)
 {
 	kfifo_in_spinlocked(&in_fifo, data, size, &fifo_lock);
+	wake_up_interruptible(&in_fifo_has_data);
 }
 
-/*	ldt_port_put - emulates sending data to HW port
+/*	ldt_port_put - emulates sending and receiving data to loopback HW port
  *
  */
 void ldt_port_put(void *data, int size)
@@ -83,7 +87,7 @@ void ldt_port_put(void *data, int size)
 	ldt_received(data, size);
 }
 
-static DECLARE_COMPLETION(ldt_comlete);
+static DECLARE_COMPLETION(ldt_complete);
 
 /* Fictive label _entry is used for tracing  */
 
@@ -92,10 +96,10 @@ int ldt_completed(void)
 	int ret;
 _entry:;
 	once(print_context());
-	ret = wait_for_completion_interruptible(&ldt_comlete);
+	ret = wait_for_completion_interruptible(&ldt_complete);
 	if (ret == -ERESTARTSYS) {
+		trlm("interrupted");
 		ret = -EINTR;
-		trlm("intrrupred");
 	}
 	return ret;
 }
@@ -141,7 +145,7 @@ void ldt_timer_func(unsigned long data)
 {
 _entry:;
 	tasklet_schedule(&ldt_tasklet);
-	mod_timer(&ldt_timer, jiffies + HZ / 10);
+	mod_timer(&ldt_timer, jiffies + HZ / 100);
 }
 
 DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
@@ -166,10 +170,27 @@ static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff
 	unsigned int copied;
 _entry:
 	// TODO: implement blocking I/O
-	if (mutex_lock_interruptible(&read_lock))
+	trvx(file->f_flags & O_NONBLOCK);
+	if (kfifo_is_empty(&in_fifo)) {
+		if (file->f_flags & O_NONBLOCK) {
+			ret = -EAGAIN;
+			goto exit;
+		} else {
+			ret = wait_event_interruptible(in_fifo_has_data, !kfifo_is_empty(&in_fifo));
+			if (ret == -ERESTARTSYS) {
+				trlm("interrupted");
+				ret = -EINTR;
+				goto exit;
+			}
+		}
+	}
+	if (mutex_lock_interruptible(&read_lock)) {
+		trlm("interrupted");
 		return -EINTR;
+	}
 	ret = kfifo_to_user(&in_fifo, buf, count, &copied);
 	mutex_unlock(&read_lock);
+exit:
 	return ret ? ret : copied;
 }
 
@@ -181,8 +202,9 @@ static ssize_t ldt_write(struct file *file, const char __user * buf, size_t coun
 	unsigned int copied;
 _entry:
 	// TODO: implement blocking I/O
-	if (mutex_lock_interruptible(&write_lock))
+	if (mutex_lock_interruptible(&write_lock)) {
 		return -EINTR;
+	}
 	ret = kfifo_from_user(&out_fifo, buf, count, &copied);
 	mutex_unlock(&write_lock);
 	return ret ? ret : copied;
@@ -195,7 +217,7 @@ void pages_set_reserved(struct page *page, int pages)
 }
 
 /*	pages_flag - set or clear a flag for sequence of pages
- *   
+ *
  *	more generic soultion instead SetPageReserved, ClearPageReserved etc
  */
 
