@@ -15,11 +15,12 @@
  *		mmap
  *		ioctl
  *	kfifo
- *	completion TODO
+ *	completion
  *	interrupt
  *	tasklet
- *	work
  *	timer
+ *	work
+ * 	kthread
  *	misc device
  *	proc fs
  *	platform_driver and platform_device in another module
@@ -30,6 +31,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <linux/kthread.h>
 #include <linux/timer.h>
 #include <linux/kfifo.h>
 #include <linux/fs.h>
@@ -91,19 +93,6 @@ static DECLARE_COMPLETION(ldt_complete);
 
 /* Fictive label _entry is used for tracing  */
 
-int ldt_completed(void)
-{
-	int ret;
-_entry:;
-	once(print_context());
-	ret = wait_for_completion_interruptible(&ldt_complete);
-	if (ret == -ERESTARTSYS) {
-		trlm("interrupted");
-		ret = -EINTR;
-	}
-	return ret;
-}
-
 void ldt_work_func(struct work_struct *work)
 {
 _entry:;
@@ -126,6 +115,7 @@ _entry:;
 		ldt_port_put(&unit, sizeof(unit));
 	}
 	schedule_work(&ldt_work);
+	complete(&ldt_complete);
 }
 
 DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
@@ -144,6 +134,9 @@ struct timer_list ldt_timer;
 void ldt_timer_func(unsigned long data)
 {
 _entry:;
+	/*
+	   this timer is used just to run tasklet, when there is no interrupt
+	 */
 	tasklet_schedule(&ldt_tasklet);
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
 }
@@ -287,6 +280,36 @@ static struct miscdevice ldt_miscdev = {
 	&ldt_fops,
 };
 
+int lkd_thread_sub(void *data)
+{
+	int ret = 0;
+_entry:
+	/*
+	   perform here a useful work in task context
+	 */
+	return ret;
+}
+
+int lkd_thread(void *data)
+{
+	int ret = 0;
+_entry:
+	print_context();
+	while (!kthread_should_stop()) {
+		ret = wait_for_completion_interruptible(&ldt_complete);
+		if (ret == -ERESTARTSYS) {
+			trlm("interrupted");
+			ret = -EINTR;
+			break;
+		}
+		trllog();
+		ret = lkd_thread_sub(data);
+	}
+	return ret;
+}
+
+static struct task_struct *thread;
+
 static __devinit int ldt_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -331,6 +354,10 @@ _entry:
 	}
 	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
+	thread = kthread_run(lkd_thread, NULL, "%s", KBUILD_MODNAME);
+	if (IS_ERR(thread)) {
+		ret = PTR_ERR(thread);
+	}
 exit:
 	trl_();
 	trvd(ret);
@@ -340,6 +367,9 @@ exit:
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 _entry:
+	if (!IS_ERR(thread)) {
+		kthread_stop(thread);
+	}
 	remove_proc_entry(KBUILD_MODNAME, NULL);
 	misc_deregister(&ldt_miscdev);
 	del_timer(&ldt_timer);
