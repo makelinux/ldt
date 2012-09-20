@@ -11,7 +11,9 @@ Main source file of LDT:
 
 Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/ldt-test)**
 
-Browse the rest code: https://github.com/makelinux/ldt/
+Generic testing utility for Device I/O: **[dio.c](https://github.com/makelinux/ldt/blob/master/dio.c)**
+
+Browse the rest source: https://github.com/makelinux/ldt/
 
 ## Usage:
 
