@@ -1,6 +1,6 @@
 # LDT - Linux Driver Template
 
-It is useful for Linux driver development beginners and as starting point for a new drivers. 
+LDT project is useful for Linux driver development beginners and as starting point for a new drivers. 
 The driver uses following Linux facilities: 
 module, file_operations (read/write, mmap, ioctl, blocking and nonblocking mode, poll), kfifo, completion, interrupt, tasklet, work, kthread, timer, misc device, proc fs.
 
@@ -11,7 +11,9 @@ Main source file of LDT:
 
 Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/ldt-test)**
 
-Browse the rest code: https://github.com/makelinux/ldt/
+Generic testing utility for Device I/O: **[dio.c](https://github.com/makelinux/ldt/blob/master/dio.c)**
+
+Browse the rest source: https://github.com/makelinux/ldt/
 
 ## Usage:
 
