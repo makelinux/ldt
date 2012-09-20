@@ -1,5 +1,5 @@
 /*
- *	DIO - Device Input/Output utility
+ *	DIO - Device Input/Output utility for testing device drivers
  *
  *	stdin/stdout <--> dio <--> mmap, ioctl, read/write
  *
@@ -98,12 +98,9 @@ int input(int dev, void *buf, int size)
 
 int io_start(int dev)
 {
-	struct pollfd pfd[2] = { {
-				  0,},
-	};
+	struct pollfd pfd[2];
 	ssize_t data_in_len, len_total = 0;
 	int i = 0;
-	memset(pfd, 100, sizeof(pfd));
 	pfd[0].fd = fileno(stdin);
 	pfd[0].events = POLLIN;
 	pfd[1].fd = dev;

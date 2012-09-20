@@ -117,9 +117,8 @@ static inline unsigned int _hweight16(unsigned int n)
 #define trllog(args ... ) \
 do {  \
 	static int num; 			\
- 	if ( _hweight16(num) < 2 ) { 	\
-		trl_();	\
-		tracef("#0x%x\n",(int)num); 		\
+ 	if ( _hweight16(num) < 2 ) { 		\
+		trla("#0x%x\n",(int)num); 	\
 	}	num++; 				\
 } while (0)
 

@@ -1,7 +1,7 @@
 /*
  *	LDT - Linux Driver Template
  *
- *	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
+ *	Copyright (C) 2012 Constantine Shulyupin http://www.makelinux.net/
  *
  *	Dual BSD/GPL License
  *
@@ -12,6 +12,7 @@
  *	file_operations
  *		read and write
  *		blocking read
+ *		poll
  *		mmap
  *		ioctl
  *	kfifo
@@ -35,6 +36,7 @@
 #include <linux/timer.h>
 #include <linux/kfifo.h>
 #include <linux/fs.h>
+#include <linux/poll.h>
 #include <linux/proc_fs.h>
 #include <linux/module.h>
 #include <linux/miscdevice.h>
@@ -78,7 +80,7 @@ void ldt_received(void *data, int size)
 	wake_up_interruptible(&in_fifo_has_data);
 }
 
-/*	ldt_port_put - emulates sending and receiving data to loopback HW port
+/*	ldt_port_put - emulates sending and receiving data to loop-back HW port
  *
  */
 void ldt_port_put(void *data, int size)
@@ -91,7 +93,7 @@ void ldt_port_put(void *data, int size)
 
 static DECLARE_COMPLETION(ldt_complete);
 
-/* Fictive label _entry is used for tracing  */
+/* Fictive label _entry is used for tracing */
 
 void ldt_work_func(struct work_struct *work)
 {
@@ -102,17 +104,17 @@ _entry:;
 
 DECLARE_WORK(ldt_work, ldt_work_func);
 
-void ldt_tasklet_func(unsigned long data)
+void ldt_tasklet_func(unsigned long d)
 {
 	int ret;
-	char unit;
+	char data;
 _entry:;
 	once(print_context());
-	ret = kfifo_out_spinlocked(&out_fifo, &unit, sizeof(unit), &fifo_lock);
+	ret = kfifo_out_spinlocked(&out_fifo, &data, sizeof(data), &fifo_lock);
 	if (ret) {
 		trl_();
-		trvd(unit);
-		ldt_port_put(&unit, sizeof(unit));
+		trvd(data);
+		ldt_port_put(&data, sizeof(data));
 	}
 	schedule_work(&ldt_work);
 	complete(&ldt_complete);
@@ -135,7 +137,7 @@ void ldt_timer_func(unsigned long data)
 {
 _entry:;
 	/*
-	   this timer is used just to run tasklet, when there is no interrupt
+	 *	this timer is used just to fire tasklet, when there is no interrupt
 	 */
 	tasklet_schedule(&ldt_tasklet);
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
@@ -146,6 +148,8 @@ DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 static int ldt_open(struct inode *inode, struct file *file)
 {
 _entry:;
+	trl_();
+	trvx(file->f_flags & O_NONBLOCK);
 	return 0;
 }
 
@@ -163,12 +167,12 @@ static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff
 	unsigned int copied;
 _entry:
 	// TODO: implement blocking I/O
-	trvx(file->f_flags & O_NONBLOCK);
 	if (kfifo_is_empty(&in_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			ret = -EAGAIN;
 			goto exit;
 		} else {
+			trlm("waiting");
 			ret = wait_event_interruptible(in_fifo_has_data, !kfifo_is_empty(&in_fifo));
 			if (ret == -ERESTARTSYS) {
 				trlm("interrupted");
@@ -194,7 +198,7 @@ static ssize_t ldt_write(struct file *file, const char __user * buf, size_t coun
 	int ret;
 	unsigned int copied;
 _entry:
-	// TODO: implement blocking I/O
+	// TODO wait_event_interruptible ... out_fifo_has_space
 	if (mutex_lock_interruptible(&write_lock)) {
 		return -EINTR;
 	}
@@ -203,15 +207,34 @@ _entry:
 	return ret ? ret : copied;
 }
 
+static unsigned int ldt_poll(struct file *file, poll_table * pt)
+{
+	unsigned int mask = 0;
+_entry:
+	poll_wait(file, &in_fifo_has_data, pt);
+	//poll_wait(file, out_fifo_has_space, pt); // TODO
+
+	if (!kfifo_is_empty(&in_fifo)) {
+		mask |= POLLIN | POLLRDNORM;
+	}
+	mask |= POLLOUT | POLLWRNORM;
+	//mask |= POLLHUP; // on output eof
+	//mask |= POLLERR; // on output error
+	trl_();
+	trvx(mask);
+	return mask;
+}
+
 void pages_set_reserved(struct page *page, int pages)
 {
 	for (; pages; pages--, page++)
 		SetPageReserved(page);
 }
 
-/*	pages_flag - set or clear a flag for sequence of pages
+/*
+ *	pages_flag - set or clear a flag for sequence of pages
  *
- *	more generic soultion instead SetPageReserved, ClearPageReserved etc
+ *	more generic solution instead SetPageReserved, ClearPageReserved etc
  */
 
 void pages_flag(struct page *page, int pages, int mask, int value)
@@ -269,9 +292,9 @@ struct file_operations ldt_fops = {
 	.release = ldt_release,
 	.read = ldt_read,
 	.write = ldt_write,
+	.poll = ldt_poll,
 	.mmap = ldt_mmap,
 	.unlocked_ioctl = ldt_ioctl,
-	.poll = NULL,		// TODO
 };
 
 static struct miscdevice ldt_miscdev = {
@@ -318,7 +341,10 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 _entry:
 	print_context();
 	trl_();
+	trvs_(__DATE__);
+	trvs_(__TIME__);
 	trvs_(KBUILD_MODNAME);
+	trl_();
 	trvp_(pdev);
 	trvd_(irq);
 	trvd_(bufsize);
@@ -392,7 +418,7 @@ _entry:
 #ifdef USE_PLATFORM_DEVICE
 
 /*
- * Folowing code requres platform_device (ldt_plat_dev.*) to work
+ * Following code requires platform_device (ldt_plat_dev.*) to work
  */
 
 static struct platform_driver ldt_driver = {
