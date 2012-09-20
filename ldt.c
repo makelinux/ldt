@@ -67,7 +67,7 @@ static int ldt_work_counter;
 static DEFINE_KFIFO(in_fifo, char, FIFO_SIZE);
 static DEFINE_KFIFO(out_fifo, char, FIFO_SIZE);
 
-static DECLARE_WAIT_QUEUE_HEAD(in_fifo_has_data);
+static DECLARE_WAIT_QUEUE_HEAD(ldt_readable);
 
 spinlock_t fifo_lock;
 
@@ -77,7 +77,7 @@ spinlock_t fifo_lock;
 void ldt_received(void *data, int size)
 {
 	kfifo_in_spinlocked(&in_fifo, data, size, &fifo_lock);
-	wake_up_interruptible(&in_fifo_has_data);
+	wake_up_interruptible(&ldt_readable);
 }
 
 /*	ldt_port_put - emulates sending and receiving data to loop-back HW port
@@ -137,7 +137,7 @@ void ldt_timer_func(unsigned long data)
 {
 _entry:;
 	/*
-	 *	this timer is used just to fire tasklet, when there is no interrupt
+	 *      this timer is used just to fire tasklet, when there is no interrupt
 	 */
 	tasklet_schedule(&ldt_tasklet);
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
@@ -173,7 +173,7 @@ _entry:
 			goto exit;
 		} else {
 			trlm("waiting");
-			ret = wait_event_interruptible(in_fifo_has_data, !kfifo_is_empty(&in_fifo));
+			ret = wait_event_interruptible(ldt_readable, !kfifo_is_empty(&in_fifo));
 			if (ret == -ERESTARTSYS) {
 				trlm("interrupted");
 				ret = -EINTR;
@@ -198,7 +198,7 @@ static ssize_t ldt_write(struct file *file, const char __user * buf, size_t coun
 	int ret;
 	unsigned int copied;
 _entry:
-	// TODO wait_event_interruptible ... out_fifo_has_space
+	// TODO wait_event_interruptible ... ldt_writeable
 	if (mutex_lock_interruptible(&write_lock)) {
 		return -EINTR;
 	}
@@ -211,8 +211,8 @@ static unsigned int ldt_poll(struct file *file, poll_table * pt)
 {
 	unsigned int mask = 0;
 _entry:
-	poll_wait(file, &in_fifo_has_data, pt);
-	//poll_wait(file, out_fifo_has_space, pt); // TODO
+	poll_wait(file, &ldt_readable, pt);
+	//poll_wait(file, ldt_writeable, pt); // TODO
 
 	if (!kfifo_is_empty(&in_fifo)) {
 		mask |= POLLIN | POLLRDNORM;
@@ -223,12 +223,6 @@ _entry:
 	trl_();
 	trvx(mask);
 	return mask;
-}
-
-void pages_set_reserved(struct page *page, int pages)
-{
-	for (; pages; pages--, page++)
-		SetPageReserved(page);
 }
 
 /*
@@ -244,19 +238,19 @@ void pages_flag(struct page *page, int pages, int mask, int value)
 			__set_bit(mask, &page->flags);
 		else
 			__clear_bit(mask, &page->flags);
-
 }
 
 static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	void *buf;
+	void *buf = NULL;
 _entry:
 	if (vma->vm_flags & VM_WRITE)
 		buf = in_buf;
 	else if (vma->vm_flags & VM_READ)
 		buf = out_buf;
-
-	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(in_buf) >> PAGE_SHIFT,
+	if (!buf)
+		return -EINVAL;
+	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(buf) >> PAGE_SHIFT,
 			    vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
 		trlm("remap_pfn_range failed");
 		return -EAGAIN;
@@ -270,9 +264,7 @@ long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 _entry:
 	trl_();
 	trvx_(cmnd);
-	trvx_(_IOC_DIR(cmnd));
 	trvx(arg);
-	// TODO: manage data and poll
 	trace_ioctl(cmnd);
 	if (_IOC_DIR(cmnd) == _IOC_WRITE) {
 		copy_from_user(in_buf, user, _IOC_SIZE(cmnd));
@@ -282,6 +274,14 @@ _entry:
 	if (_IOC_DIR(cmnd) == _IOC_READ) {
 		copy_to_user(user, out_buf, _IOC_SIZE(cmnd));
 		memset(out_buf, 0, bufsize);
+	}
+	switch (_IOC_TYPE(cmnd)) {
+	case 'A':
+		switch (_IOC_NR(cmnd)) {
+		case 0:
+			break;
+		}
+		break;
 	}
 	return 0;
 }
@@ -303,7 +303,7 @@ static struct miscdevice ldt_miscdev = {
 	&ldt_fops,
 };
 
-int lkd_thread_sub(void *data)
+int ldt_thread_sub(void *data)
 {
 	int ret = 0;
 _entry:
@@ -313,7 +313,7 @@ _entry:
 	return ret;
 }
 
-int lkd_thread(void *data)
+int ldt_thread(void *data)
 {
 	int ret = 0;
 _entry:
@@ -326,7 +326,7 @@ _entry:
 			break;
 		}
 		trllog();
-		ret = lkd_thread_sub(data);
+		ret = ldt_thread_sub(data);
 	}
 	return ret;
 }
@@ -380,7 +380,7 @@ _entry:
 	}
 	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
-	thread = kthread_run(lkd_thread, NULL, "%s", KBUILD_MODNAME);
+	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
 	if (IS_ERR(thread)) {
 		ret = PTR_ERR(thread);
 	}
