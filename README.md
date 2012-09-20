@@ -1,6 +1,6 @@
 # LDT - Linux Driver Template
 
-It is useful for Linux driver development beginners and as starting point for a new drivers. 
+LDT project is useful for Linux driver development beginners and as starting point for a new drivers. 
 The driver uses following Linux facilities: 
 module, file_operations (read/write, mmap, ioctl, blocking and nonblocking mode, poll), kfifo, completion, interrupt, tasklet, work, kthread, timer, misc device, proc fs.
 
