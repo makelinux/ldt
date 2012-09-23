@@ -16,6 +16,7 @@ GRAY="\\033[0;37m"
 set -o errtrace
 tracing=/sys/kernel/debug/tracing
 irq=0	# define irq to bind diriver to HW IRQ, WARING: can hung the system
+irq=4	# serial port
 # irq=`grep ehci_hcd /proc/interrupts | cut -f1 -d:`
 
 tracing()
@@ -43,6 +44,7 @@ tracing_stop()
 }
 
 # sudo rmmod parport_pc parport  ppdev lp
+sudo dmesg -n 7
 sudo rmmod ldt ldt_plat_dev 2> /dev/null
 set -o errexit
 make -s

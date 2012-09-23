@@ -41,13 +41,17 @@
 #include <linux/module.h>
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
+#include <linux/serial_reg.h>
 
 static int bufsize = PFN_ALIGN(16 * 1024);
 static void *in_buf;
 static void *out_buf;
 
-int irq = 0;
+int irq = 4;
 module_param(irq, int, 0);
+
+int portn = 0x3f8; /* serial */
+module_param(portn, int, 0);
 
 /*
  * Prints execution context: hard interrupt, soft interrupt or scheduled task
@@ -85,10 +89,17 @@ void ldt_received(void *data, int size)
  */
 void ldt_port_put(void *data, int size)
 {
+#ifdef USE_UART
+	if ( inb(portn+UART_LSR) & UART_LSR_THRE) {
+		outb(*(char*)data,portn + UART_TX);
+	}
+#endif
+#ifdef USE_SW_LOOPBACK
 	/*
 	 * emulate loop back port
 	 */
 	ldt_received(data, size);
+#endif
 }
 
 static DECLARE_COMPLETION(ldt_complete);
@@ -98,8 +109,8 @@ static DECLARE_COMPLETION(ldt_complete);
 void ldt_work_func(struct work_struct *work)
 {
 _entry:;
-	once(print_context());
-	ldt_work_counter++;
+       once(print_context());
+       ldt_work_counter++;
 }
 
 DECLARE_WORK(ldt_work, ldt_work_func);
@@ -107,15 +118,23 @@ DECLARE_WORK(ldt_work, ldt_work_func);
 void ldt_tasklet_func(unsigned long d)
 {
 	int ret;
-	char data;
-_entry:;
+	char data_out, data_in;
+_entry:
 	once(print_context());
-	ret = kfifo_out_spinlocked(&out_fifo, &data, sizeof(data), &fifo_lock);
+	ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock);
 	if (ret) {
 		trl_();
-		trvd(data);
-		ldt_port_put(&data, sizeof(data));
+		trvd(data_out);
+		ldt_port_put(&data_out, sizeof(data_out));
 	}
+
+#ifdef USE_UART
+	if ( inb(portn+UART_LSR) & UART_LSR_DR ) {
+		data_in = inb(portn + UART_RX);
+		trl_();trvd(data_in);
+		ldt_received(&data_in, sizeof(data_in));
+	}
+#endif
 	schedule_work(&ldt_work);
 	complete(&ldt_complete);
 }
@@ -124,18 +143,19 @@ DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
 
 irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
-_entry:;
+_entry:
+	trl();
 	once(print_context());
 	isr_counter++;
 	tasklet_schedule(&ldt_tasklet);
-	return IRQ_NONE;	/* not our IRQ */
-	// return IRQ_HANDLED; /* our IRQ */
+	//return IRQ_NONE;	/* not our IRQ */
+	return IRQ_HANDLED; /* our IRQ */
 }
 
 struct timer_list ldt_timer;
 void ldt_timer_func(unsigned long data)
 {
-_entry:;
+_entry:
 	/*
 	 *      this timer is used just to fire tasklet, when there is no interrupt
 	 */
@@ -147,7 +167,7 @@ DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 
 static int ldt_open(struct inode *inode, struct file *file)
 {
-_entry:;
+_entry:
 	trl_();
 	trvx(file->f_flags & O_NONBLOCK);
 	return 0;
@@ -155,7 +175,7 @@ _entry:;
 
 static int ldt_release(struct inode *inode, struct file *file)
 {
-_entry:;
+_entry:
 	return 0;
 }
 
@@ -375,9 +395,27 @@ _entry:
 		goto exit;
 	trvd(ldt_miscdev.minor);
 	isr_counter = 0;
+	if (portn) {
+		//release_region(portn, 8);
+		if ( !request_region(portn, 8, KBUILD_MODNAME)) {
+			printk(KERN_WARNING"portn is already used\n");
+		}
+	}
 	if (irq) {
 		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
+		if (ret > -1) {
+			outb(UART_IER_RDI | UART_IER_RLSI , portn + UART_IER);
+			//outb(UART_FCR_R_TRIG_11 | UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
+			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
+			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, portn + UART_MCR);
+		}
 	}
+	trvd(ret);
+	trvx(inb(portn+UART_IER));
+	trvx(inb(portn+UART_IIR));
+	trvx(inb(portn+UART_FCR));
+	trvx(inb(portn+UART_LCR));
+	trvx(inb(portn+UART_MCR));
 	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
 	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
@@ -393,15 +431,18 @@ exit:
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 _entry:
+	remove_proc_entry(KBUILD_MODNAME, NULL);
+
+	misc_deregister(&ldt_miscdev);
 	if (!IS_ERR(thread)) {
 		kthread_stop(thread);
 	}
-	remove_proc_entry(KBUILD_MODNAME, NULL);
-	misc_deregister(&ldt_miscdev);
 	del_timer(&ldt_timer);
 	if (irq) {
+		outb(0, portn + UART_IER);
 		free_irq(irq, THIS_MODULE);
 	}
+	tasklet_kill(&ldt_tasklet);
 	if (in_buf) {
 		pages_flag(virt_to_page(in_buf), PFN_UP(bufsize), PG_reserved, 0);
 		free_pages_exact(in_buf, bufsize);
