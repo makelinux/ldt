@@ -84,7 +84,7 @@ echo received $received
 fi
 
 data=123mmap
-received=`sudo echo $data | ./dio --mmap /dev/ldt`
+received=`sudo echo -n $data | ./dio --mmap /dev/ldt`
 if [ "$data" == "$received" ]; then
 echo -e "${GREEN}LDT mmap test passed$NOCOLOR"
 else
@@ -94,7 +94,7 @@ echo received $received
 fi
 
 data=123ioctl
-received=`sudo echo $data | ./dio --ioctl /dev/ldt`
+received=`sudo echo -n $data | ./dio --ioctl /dev/ldt`
 if [ "$data" == "$received" ]; then
 echo -e "${GREEN}LDT ioctl test passed$NOCOLOR"
 else
