@@ -2,8 +2,10 @@
 ccflags-y+=-include $M/ctracer.h
 ccflags-y+=-D CTRACER_ON
 ccflags-y+=-D USE_PLATFORM_DEVICE
-#ccflags-y+=-D USE_UART
-ccflags-y+=-D USE_SW_LOOPBACK
+
+ccflags-y+=-D USE_UART
+#ccflags-y+=-D USE_SW_LOOPBACK
+
 obj-m+= ldt.o
 obj-m+= ldt_plat_drv.o # implements platform_driver only
 obj-m+= ldt_plat_dev.o # implements platform_device and resource

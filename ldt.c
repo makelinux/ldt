@@ -47,8 +47,11 @@ static int bufsize = PFN_ALIGN(16 * 1024);
 static void *in_buf;
 static void *out_buf;
 
-int irq = 4;
+static int irq = 4;
 module_param(irq, int, 0);
+
+static int loopback;
+module_param(loopback, int, 0);
 
 int portn = 0x3f8; /* serial */
 module_param(portn, int, 0);
@@ -63,6 +66,9 @@ module_param(portn, int, 0);
 
 #define check(a) \
 ( ret=a,((ret<0)?tracef("%s:%i %s FAIL\n\t%i=%s\n",__FILE__,__LINE__,__FUNCTION__,ret,#a):0),ret)
+
+#define trace(a) \
+do { printk("%s:%i %s calling %s\n",__FILE__,__LINE__,__FUNCTION__,#a);a; printk("done\n"); } while (0)
 
 static int isr_counter;
 static int ldt_work_counter;
@@ -121,6 +127,7 @@ void ldt_tasklet_func(unsigned long d)
 	char data_out, data_in;
 _entry:
 	once(print_context());
+	trvx(inb(portn+UART_LSR));
 	ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock);
 	if (ret) {
 		trl_();
@@ -159,7 +166,7 @@ _entry:
 	/*
 	 *      this timer is used just to fire tasklet, when there is no interrupt
 	 */
-	tasklet_schedule(&ldt_tasklet);
+	//tasklet_schedule(&ldt_tasklet);
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
 }
 
@@ -338,8 +345,9 @@ int ldt_thread(void *data)
 	int ret = 0;
 _entry:
 	print_context();
+	allow_signal(SIGINT);
 	while (!kthread_should_stop()) {
-		ret = wait_for_completion_interruptible(&ldt_complete);
+		ret = check(wait_for_completion_interruptible(&ldt_complete));
 		if (ret == -ERESTARTSYS) {
 			trlm("interrupted");
 			ret = -EINTR;
@@ -408,6 +416,8 @@ _entry:
 			//outb(UART_FCR_R_TRIG_11 | UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
 			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
 			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, portn + UART_MCR);
+			if (loopback)
+				outb(inb(portn+UART_MCR) | UART_MCR_LOOP, portn + UART_MCR);
 		}
 	}
 	trvd(ret);
@@ -431,16 +441,20 @@ exit:
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 _entry:
-	remove_proc_entry(KBUILD_MODNAME, NULL);
+	trace(remove_proc_entry(KBUILD_MODNAME, NULL));
 
-	misc_deregister(&ldt_miscdev);
+	trace(misc_deregister(&ldt_miscdev));
 	if (!IS_ERR(thread)) {
-		kthread_stop(thread);
+		trace(send_sig(SIGINT, thread, 1));
+		trace(kthread_stop(thread));
 	}
-	del_timer(&ldt_timer);
+	trace(del_timer(&ldt_timer));
 	if (irq) {
 		outb(0, portn + UART_IER);
-		free_irq(irq, THIS_MODULE);
+		outb(0, portn + UART_FCR);
+		outb(0, portn + UART_FCR);
+		inb(portn + UART_RX);
+		trace(free_irq(irq, THIS_MODULE));
 	}
 	tasklet_kill(&ldt_tasklet);
 	if (in_buf) {
