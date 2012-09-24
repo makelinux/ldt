@@ -124,7 +124,7 @@ int io_start(int dev)
 				usleep(100000);
 				break;
 			}
-			if (!data_in_len && !ignore_eof ) {
+			if (!data_in_len && !ignore_eof) {
 				// read returns 0 on End Of File
 				break;
 			}
@@ -173,17 +173,17 @@ again:
 		if ((!ignore_eof && pfd[0].revents & POLLHUP) || pfd[1].revents & POLLHUP)
 			break;
 		i++;
-		if ( loops && i >= loops )
+		if (loops && i >= loops)
 			break;
 		usleep(1000 * delay);
 	}
 #ifdef VERBOSE
-		trl_();
-		trvd_(i);
-		trvd_(len_total);
-		trvd_(data_in_len);
-		trvd_(data_out_len);
-		trln();
+	trl_();
+	trvd_(i);
+	trvd_(len_total);
+	trvd_(data_in_len);
+	trvd_(data_out_len);
+	trln();
 #endif
 	return ret;
 }
