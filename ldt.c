@@ -50,6 +50,7 @@ static void *in_buf;
 static void *out_buf;
 static int uart_detected;
 
+// TODO: move to ldt_platform_device
 int port = 0x3f8;		/* UART port */
 module_param(port, int, 0);
 
