@@ -39,3 +39,5 @@ v2.6.36-rc8
 ### Failed compilation with:
 
 v2.6.35-rc6 failed because of DEFINE_FIFO
+<img height=1 width=1 src=http://const.homelinux.net/1.png>
+--
