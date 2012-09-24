@@ -46,9 +46,20 @@ tracing_stop()
 # sudo rmmod parport_pc parport  ppdev lp
 sudo dmesg -n 7
 sudo rmmod ldt ldt_plat_dev 2> /dev/null
+stty -F /dev/ttyS0 115200
 set -o errexit
 make -s
-sudo insmod ldt.ko irq=$irq
+data='loopback?'
+received=`echo $data | ./dio  --ignore_eof --loops 2 --delay 10 /dev/ttyS0`
+if [ "$data" == "$received" ]; then
+echo -e "Loopback on /dev/ttyS0 detected"
+loopback=0
+else
+echo -e "No loopback on /dev/ttyS0 detected, running ldt driver with loopback emulation"
+loopback=1
+fi
+
+sudo insmod ldt.ko loopback=$loopback
 sudo insmod ldt_plat_dev.ko
 
 tracing_start || true
@@ -57,7 +68,7 @@ tracing_start || true
 . /sys/class/misc/ldt/uevent # get $MAJOR $MINOR
 sudo sh -c "rm /dev/ldt;sudo mknod /dev/ldt c $MAJOR $MINOR; chmod o+rw /dev/ldt"
 data=123rw
-echo -n $data > /dev/ldt
+echo $data > /dev/ldt
 sleep 0.5
 received=`dd iflag=nonblock if=/dev/ldt 2> /dev/null || true`
 if [ "$data" == "$received" ]; then
@@ -70,7 +81,7 @@ fi
 
 data=123bl
 cat /dev/ldt > R.tmp &
-sleep 0.5; echo -n $data > /dev/ldt;
+sleep 0.5; echo $data > /dev/ldt;
 sleep 0.5
 kill %1; wait %1 2> /dev/null || true
 received=`cat R.tmp`
@@ -84,7 +95,7 @@ echo received $received
 fi
 
 data=123mmap
-received=`sudo echo -n $data | ./dio --mmap /dev/ldt`
+received=`sudo echo $data | ./dio --mmap /dev/ldt`
 if [ "$data" == "$received" ]; then
 echo -e "${GREEN}LDT mmap test passed$NOCOLOR"
 else
@@ -94,7 +105,7 @@ echo received $received
 fi
 
 data=123ioctl
-received=`sudo echo -n $data | ./dio --ioctl /dev/ldt`
+received=`sudo echo $data | ./dio --ioctl /dev/ldt`
 if [ "$data" == "$received" ]; then
 echo -e "${GREEN}LDT ioctl test passed$NOCOLOR"
 else
