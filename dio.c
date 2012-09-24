@@ -312,7 +312,7 @@ int main(int argc, char *argv[])
 		trvd_(ignore_eof);
 		trvd_(verbose);
 		trvp(mm);
-		trvi(mm);
+		trvd((int)mm);
 		trln();
 	}
 	switch (io_type) {
