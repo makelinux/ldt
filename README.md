@@ -39,5 +39,8 @@ v2.6.36-rc8
 ### Failed compilation with:
 
 v2.6.35-rc6 failed because of DEFINE_FIFO
+
 <img src="http://const.homelinux.net/1.png">
+
+<img src="http://www.android.com/images/brand/android_app_on_play_large.png">
 --
