@@ -55,9 +55,10 @@ if [ "$data" == "$received" ]; then
 echo -e "Loopback on /dev/ttyS0 detected"
 loopback=0
 else
-echo -e "No loopback on /dev/ttyS0 detected, running ldt driver with loopback emulation"
+echo -e "No loopback on /dev/ttyS0 detected, running ldt driver with UART loopback mode"
 loopback=1
 fi
+junk=`echo | ./dio  --ignore_eof --loops 10 --delay 10 /dev/ttyS0`
 
 sudo insmod ldt.ko loopback=$loopback
 sudo insmod ldt_plat_dev.ko
