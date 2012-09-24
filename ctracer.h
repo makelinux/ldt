@@ -160,34 +160,8 @@ do {  \
 #define EOL "\n"		// for console
 //#define EOL "\r\n" // for com port
 
-// trace variables: integer, hex, string, pointer, float, time value, with and w/o new line
-#define trvi_(i) tracef(#i" = %i ",(int)i)
-#define trvi(i) tracef(#i" = %i"EOL,(int)i)
-#define trvx_(x) tracef(#x" = 0x%x ",(int)x)
-#define trvx(x) tracef(#x" = 0x%x"EOL,(int)x)
-#define trvlx(x) tracef(#x" = %#llx"EOL,(int)x)
-#define trvX(x) tracef(#x" = %#X"EOL,(int)x)
-#define trvf(f) tracef(#f" = %f"EOL,f)
-#define trvf_(f) tracef(#f" = %f ",f)
-#define trvd(d) tracef(#d" = %d"EOL,(int)d)
-#define trvtv_(tv) tracef(#tv" = %u.%06u ",(unsigned int)tv.tv_sec,(unsigned int)tv.tv_usec)
-#define trvtv(tv) tracef(#tv" = %u.%06u"EOL,(unsigned int)tv.tv_sec,(unsigned int)tv.tv_usec)
-#define trvd_(d) tracef(#d" = %d ",(int)d)
-#define trvs(s) tracef(#s" = \"%s\""EOL,s)
-#define trvs_(s) tracef(#s" = \"%s\" ",s)
-#define trvp(p) tracef(#p" = %08x"EOL,(unsigned)p)
-#define trvp_(p) tracef(#p" = %08x ",(unsigned)p)
-#define trvc(c) tracef(#c" = %c"EOL,c)
-#define trv(t,v) tracef(#v" = %"#t##EOL,v)
-#define trvdn(d,n) {int i; tracef("%s",#d"[]=");for (i=0;i<n;i++)tracef("%d:%d,",i,(*((int*)d+i))); tracef(EOL);}
-#define trvxn(d,n) {int i; tracef("%s",#d"[]=");for (i=0;i<n;i++)tracef("%04x,",(*((int*)d+i))); tracef(EOL);}
-#define trvdr(record) trvdn(&record,sizeof(record)/sizeof(int));
-#define trvxr(record) trvxn(&record,sizeof(record)/sizeof(int));
-#define trvdnz(d) { if(d) tracef(#d" = %d"EOL,(int)d); }
-#define trlvpx(p,x) tracef(SOL"%s:%i %s "#p" = 0x%p "#x" = %x"EOL,__FILE__,__LINE__,__FUNCTION__,p,(int)x)
-#define trla(fmt, args...) tracef("%s:%i %s "fmt,__FILE__,__LINE__,__FUNCTION__, ## args)
-
 #ifdef MODULE
+// omit full absolute path for modules
 static inline char *ctracer_file_name_no_path(char *fn)
 {
 	char *strrchr(const char *s, int c);
@@ -202,19 +176,44 @@ static inline char *ctracer_file_name_no_path(char *fn)
 #else
 #define __file__	__FILE__
 #endif
-// trace location
-#define trlm(m) tracef(SOL"%s:%i %s %s"EOL,__file__,__LINE__,__FUNCTION__,m)
-#define trf(m) tracef("%s",__FUNCTION__)
-#define trf_(m) tracef("%s ",__FUNCTION__)
 
+// trace variables: integer, hex, string, pointer, float, time value, with and w/o new line
 // macro with '_' doesn't prints new line
+// notation:
+// tr = trace
+// v<format> = printf Variable in specified format (d,x,f,s, etc)
 
+#define trla(fmt, args...) tracef("%s:%i %s "fmt,__file__,__LINE__,__FUNCTION__, ## args)
+#define trv(t,v) tracef(#v" = %"t EOL,v)
+#define trv_(t,v) tracef(#v" = %"t" ",v)
+#define trvd(d) trv("d",d)
+#define trvd_(d) trv_("d",d)
+#define trvx_(x) tracef(#x" = 0x%x ",(int)x)
+#define trvx(x) tracef(#x" = 0x%x"EOL,(int)x)
+#define trvlx(x) tracef(#x" = %#llx"EOL,(int)x)
+#define trvX(x) tracef(#x" = %#X"EOL,(int)x)
+#define trvf(f) tracef(#f" = %f"EOL,f)
+#define trvf_(f) tracef(#f" = %f ",f)
+#define trvtv_(tv) tracef(#tv" = %u.%06u ",(unsigned int)tv.tv_sec,(unsigned int)tv.tv_usec)
+#define trvtv(tv) tracef(#tv" = %u.%06u"EOL,(unsigned int)tv.tv_sec,(unsigned int)tv.tv_usec)
+#define trvs(s) tracef(#s" = \"%s\""EOL,s)
+#define trvs_(s) tracef(#s" = \"%s\" ",s)
+#define trvp(p) tracef(#p" = %08x"EOL,(unsigned)p)
+#define trvp_(p) tracef(#p" = %08x ",(unsigned)p)
+#define trvdn(d,n) {int i; tracef("%s",#d"[]=");for (i=0;i<n;i++)tracef("%d:%d,",i,(*((int*)d+i))); tracef(EOL);}
+#define trvxn(d,n) {int i; tracef("%s",#d"[]=");for (i=0;i<n;i++)tracef("%04x,",(*((int*)d+i))); tracef(EOL);}
+#define trvdr(record) trvdn(&record,sizeof(record)/sizeof(int));
+#define trvxr(record) trvxn(&record,sizeof(record)/sizeof(int));
+
+// TRace Digital Variable, if Not Zero
+#define trvdnz(d) { if(d) tracef(#d" = %d"EOL,(int)d); }
+#define trace(a) do { trla("calling %s {\n",#a);a; printk("} done\n"); } while (0)
+
+// trace location, with message
+#define trlm(m) tracef(SOL"%s:%i %s %s"EOL,__file__,__LINE__,__FUNCTION__,m)
 #define trlm_(m) tracef(SOL"%s:%i %s %s ",__file__,__LINE__,__FUNCTION__,m)
 #define trl() do { trace_time(); trlm(""); } while (0)
 #define trl_() tracef(SOL"%s:%i %s ",__file__,__LINE__,__FUNCTION__)
-#define trn() tracef(EOL)
-#define trm(m) tracef("%s"EOL,m)
-#define trm_(m) tracef("%s ",m)
 #define trln() tracef(EOL)
 
 #define trl_in() trace_time();trlm("{");
