@@ -25,6 +25,7 @@
  *	misc device
  *	proc fs
  *	platform_driver and platform_device in another module
+ *	simple UART driver on port 0x3f8 with IRQ 4
  */
 
 #include <asm/io.h>
@@ -46,6 +47,7 @@
 static int bufsize = PFN_ALIGN(16 * 1024);
 static void *in_buf;
 static void *out_buf;
+static int uart_detected;
 
 static int irq = 4;
 module_param(irq, int, 0);
@@ -53,7 +55,7 @@ module_param(irq, int, 0);
 static int loopback;
 module_param(loopback, int, 0);
 
-int portn = 0x3f8; /* serial */
+int portn = 0x3f8; /* UART */
 module_param(portn, int, 0);
 
 /*
@@ -66,9 +68,6 @@ module_param(portn, int, 0);
 
 #define check(a) \
 ( ret=a,((ret<0)?tracef("%s:%i %s FAIL\n\t%i=%s\n",__FILE__,__LINE__,__FUNCTION__,ret,#a):0),ret)
-
-#define trace(a) \
-do { printk("%s:%i %s calling %s\n",__FILE__,__LINE__,__FUNCTION__,#a);a; printk("done\n"); } while (0)
 
 static int isr_counter;
 static int ldt_work_counter;
@@ -95,17 +94,19 @@ void ldt_received(void *data, int size)
  */
 void ldt_port_put(void *data, int size)
 {
-#ifdef USE_UART
-	if ( inb(portn+UART_LSR) & UART_LSR_THRE) {
-		outb(*(char*)data,portn + UART_TX);
+	if (uart_detected) {
+		if (inb(portn + UART_LSR) & UART_LSR_THRE) {
+			outb(*(char *)data, portn + UART_TX);
+		} else {
+			trlm("overflow");
+		}
+	} else {
+		/*
+		 * emulate loop back port
+		 */
+		if (loopback)
+			ldt_received(data, size);
 	}
-#endif
-#ifdef USE_SW_LOOPBACK
-	/*
-	 * emulate loop back port
-	 */
-	ldt_received(data, size);
-#endif
 }
 
 static DECLARE_COMPLETION(ldt_complete);
@@ -115,8 +116,8 @@ static DECLARE_COMPLETION(ldt_complete);
 void ldt_work_func(struct work_struct *work)
 {
 _entry:;
-       once(print_context());
-       ldt_work_counter++;
+	once(print_context());
+	ldt_work_counter++;
 }
 
 DECLARE_WORK(ldt_work, ldt_work_func);
@@ -127,21 +128,28 @@ void ldt_tasklet_func(unsigned long d)
 	char data_out, data_in;
 _entry:
 	once(print_context());
-	trvx(inb(portn+UART_LSR));
-	ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock);
-	if (ret) {
-		trl_();
-		trvd(data_out);
-		ldt_port_put(&data_out, sizeof(data_out));
+	if (uart_detected) {
+		while ((inb(portn + UART_LSR) & UART_LSR_THRE)
+		       && (ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock))) {
+			trl_();
+			trvd_(data_out);
+			trv("c",data_out);
+			ldt_port_put(&data_out, sizeof(data_out));
+		}
+		while (inb(portn + UART_LSR) & UART_LSR_DR) {
+			data_in = inb(portn + UART_RX);
+			trl_();
+			trvd_(data_in);
+			trv("c",data_in);
+			ldt_received(&data_in, sizeof(data_in));
+		}
+	} else {
+		while (kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
+			trl_();
+			trvd(data_out);
+			ldt_port_put(&data_out, sizeof(data_out));
+		}
 	}
-
-#ifdef USE_UART
-	if ( inb(portn+UART_LSR) & UART_LSR_DR ) {
-		data_in = inb(portn + UART_RX);
-		trl_();trvd(data_in);
-		ldt_received(&data_in, sizeof(data_in));
-	}
-#endif
 	schedule_work(&ldt_work);
 	complete(&ldt_complete);
 }
@@ -151,12 +159,15 @@ DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
 irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 _entry:
+	/*
+	 * UART interrupt is not called on loopback mode, therefore fire ldt_tasklet from timer too
+	 */
 	trl();
 	once(print_context());
 	isr_counter++;
 	tasklet_schedule(&ldt_tasklet);
-	//return IRQ_NONE;	/* not our IRQ */
-	return IRQ_HANDLED; /* our IRQ */
+	//return IRQ_NONE;      /* not our IRQ */
+	return IRQ_HANDLED;	/* our IRQ */
 }
 
 struct timer_list ldt_timer;
@@ -164,9 +175,9 @@ void ldt_timer_func(unsigned long data)
 {
 _entry:
 	/*
-	 *      this timer is used just to fire tasklet, when there is no interrupt
+	 *      this timer is used just to fire ldt_tasklet, when there is no interrupt
 	 */
-	//tasklet_schedule(&ldt_tasklet);
+	tasklet_schedule(&ldt_tasklet);
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
 }
 
@@ -183,6 +194,8 @@ _entry:
 static int ldt_release(struct inode *inode, struct file *file)
 {
 _entry:
+	trvd(isr_counter);
+	trvd(ldt_work_counter);
 	return 0;
 }
 
@@ -231,6 +244,7 @@ _entry:
 	}
 	ret = kfifo_from_user(&out_fifo, buf, count, &copied);
 	mutex_unlock(&write_lock);
+	tasklet_schedule(&ldt_tasklet);
 	return ret ? ret : copied;
 }
 
@@ -347,7 +361,7 @@ _entry:
 	print_context();
 	allow_signal(SIGINT);
 	while (!kthread_should_stop()) {
-		ret = check(wait_for_completion_interruptible(&ldt_complete));
+		ret = wait_for_completion_interruptible(&ldt_complete);
 		if (ret == -ERESTARTSYS) {
 			trlm("interrupted");
 			ret = -EINTR;
@@ -356,6 +370,47 @@ _entry:
 		trllog();
 		ret = ldt_thread_sub(data);
 	}
+	return ret;
+}
+
+int uart_probe(void)
+{
+	int ret = 0;
+	if (portn) {
+		if (!request_region(portn, 8, KBUILD_MODNAME)) {
+			printk(KERN_WARNING "portn is already used\n");
+		}
+	}
+	if (irq) {
+		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
+		outb(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, portn + UART_MCR);
+		uart_detected = (inb(portn + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
+		trvx(inb(portn + UART_MSR));
+
+		if (uart_detected) {
+			//outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, portn + UART_IER);
+			outb(UART_IER_RDI | UART_IER_RLSI, portn + UART_IER);
+			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, portn + UART_MCR);
+			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
+			trvd(loopback);
+			if (loopback)
+				outb(inb(portn + UART_MCR) | UART_MCR_LOOP, portn + UART_MCR);
+		}
+		if (!uart_detected && loopback) {
+			printk(KERN_WARNING"Emulating loopback is software\n");
+		}
+
+	}
+	trvx(uart_detected);
+	trvx_(inb(portn + UART_IER));
+	trvx_(inb(portn + UART_IIR));
+	trvx_(inb(portn + UART_FCR));
+	trln();
+	trvx_(inb(portn + UART_LCR));
+	trvx_(inb(portn + UART_MCR));
+	trvx_(inb(portn + UART_LSR));
+	trvx_(inb(portn + UART_MSR));
+	trln();
 	return ret;
 }
 
@@ -403,29 +458,7 @@ _entry:
 		goto exit;
 	trvd(ldt_miscdev.minor);
 	isr_counter = 0;
-	if (portn) {
-		//release_region(portn, 8);
-		if ( !request_region(portn, 8, KBUILD_MODNAME)) {
-			printk(KERN_WARNING"portn is already used\n");
-		}
-	}
-	if (irq) {
-		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
-		if (ret > -1) {
-			outb(UART_IER_RDI | UART_IER_RLSI , portn + UART_IER);
-			//outb(UART_FCR_R_TRIG_11 | UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
-			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
-			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, portn + UART_MCR);
-			if (loopback)
-				outb(inb(portn+UART_MCR) | UART_MCR_LOOP, portn + UART_MCR);
-		}
-	}
-	trvd(ret);
-	trvx(inb(portn+UART_IER));
-	trvx(inb(portn+UART_IIR));
-	trvx(inb(portn+UART_FCR));
-	trvx(inb(portn+UART_LCR));
-	trvx(inb(portn+UART_MCR));
+	uart_probe();
 	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
 	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
@@ -441,20 +474,20 @@ exit:
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 _entry:
-	trace(remove_proc_entry(KBUILD_MODNAME, NULL));
+	remove_proc_entry(KBUILD_MODNAME, NULL);
 
-	trace(misc_deregister(&ldt_miscdev));
+	misc_deregister(&ldt_miscdev);
 	if (!IS_ERR(thread)) {
-		trace(send_sig(SIGINT, thread, 1));
-		trace(kthread_stop(thread));
+		send_sig(SIGINT, thread, 1);
+		kthread_stop(thread);
 	}
-	trace(del_timer(&ldt_timer));
+	del_timer(&ldt_timer);
 	if (irq) {
 		outb(0, portn + UART_IER);
 		outb(0, portn + UART_FCR);
 		outb(0, portn + UART_FCR);
 		inb(portn + UART_RX);
-		trace(free_irq(irq, THIS_MODULE));
+		free_irq(irq, THIS_MODULE);
 	}
 	tasklet_kill(&ldt_tasklet);
 	if (in_buf) {

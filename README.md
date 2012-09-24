@@ -2,7 +2,7 @@
 
 LDT project is useful for Linux driver development beginners and as starting point for a new drivers. 
 The driver uses following Linux facilities: 
-module, file_operations (read/write, mmap, ioctl, blocking and nonblocking mode, poll), kfifo, completion, interrupt, tasklet, work, kthread, timer, misc device, proc fs.
+module, file_operations (read/write, mmap, ioctl, blocking and nonblocking mode, poll), kfifo, completion, interrupt, tasklet, work, kthread, timer, misc device, proc fs, UART 0x3f8, HW loopback, SW loopback
 
 ## Files:
 
