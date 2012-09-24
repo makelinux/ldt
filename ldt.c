@@ -10,9 +10,9 @@
  *
  *	Linux kernel module
  *	file_operations
- *		read and write
+ *		read and write (UART)
  *		blocking read
- *		poll
+ *		polling
  *		mmap
  *		ioctl
  *	kfifo
@@ -26,6 +26,7 @@
  *	proc fs
  *	platform_driver and platform_device in another module
  *	simple UART driver on port 0x3f8 with IRQ 4
+ *
  */
 
 #include <asm/io.h>
@@ -49,17 +50,17 @@ static void *in_buf;
 static void *out_buf;
 static int uart_detected;
 
+int port = 0x3f8;		/* UART port */
+module_param(port, int, 0);
+
 static int irq = 4;
 module_param(irq, int, 0);
 
 static int loopback;
 module_param(loopback, int, 0);
 
-int portn = 0x3f8; /* UART */
-module_param(portn, int, 0);
-
 /*
- * Prints execution context: hard interrupt, soft interrupt or scheduled task
+ *	print_context prints execution context: hard interrupt, soft interrupt or scheduled task
  */
 
 #define print_context()	\
@@ -80,36 +81,41 @@ static DECLARE_WAIT_QUEUE_HEAD(ldt_readable);
 
 spinlock_t fifo_lock;
 
-/*	ldt_received - called with data received from HW port
- *	Called from interrupt or emulated function
+/*
+ *	ldt_received - called with data received from HW port
+ *	Called from tasklet, which is fired from ISR or timer
  */
+
 void ldt_received(void *data, int size)
 {
 	kfifo_in_spinlocked(&in_fifo, data, size, &fifo_lock);
 	wake_up_interruptible(&ldt_readable);
 }
 
-/*	ldt_port_put - emulates sending and receiving data to loop-back HW port
- *
+/*
+ *	ldt_send - send data to HW port or emulated SW loopback
  */
-void ldt_port_put(void *data, int size)
+
+void ldt_send(void *data, int size)
 {
 	if (uart_detected) {
-		if (inb(portn + UART_LSR) & UART_LSR_THRE) {
-			outb(*(char *)data, portn + UART_TX);
+		if (inb(port + UART_LSR) & UART_LSR_THRE) {
+			outb(*(char *)data, port + UART_TX);
 		} else {
 			trlm("overflow");
 		}
 	} else {
 		/*
-		 * emulate loop back port
+		 * emulate loopback
 		 */
 		if (loopback)
 			ldt_received(data, size);
 	}
 }
 
-static DECLARE_COMPLETION(ldt_complete);
+/*
+ *	work
+ */
 
 /* Fictive label _entry is used for tracing */
 
@@ -122,6 +128,12 @@ _entry:;
 
 DECLARE_WORK(ldt_work, ldt_work_func);
 
+/*
+ *	tasklet
+ */
+
+static DECLARE_COMPLETION(ldt_complete);
+
 void ldt_tasklet_func(unsigned long d)
 {
 	int ret;
@@ -129,25 +141,25 @@ void ldt_tasklet_func(unsigned long d)
 _entry:
 	once(print_context());
 	if (uart_detected) {
-		while ((inb(portn + UART_LSR) & UART_LSR_THRE)
+		while ((inb(port + UART_LSR) & UART_LSR_THRE)
 		       && (ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock))) {
 			trl_();
 			trvd_(data_out);
-			trv("c",data_out);
-			ldt_port_put(&data_out, sizeof(data_out));
+			trv("c", data_out);
+			ldt_send(&data_out, sizeof(data_out));
 		}
-		while (inb(portn + UART_LSR) & UART_LSR_DR) {
-			data_in = inb(portn + UART_RX);
+		while (inb(port + UART_LSR) & UART_LSR_DR) {
+			data_in = inb(port + UART_RX);
 			trl_();
 			trvd_(data_in);
-			trv("c",data_in);
+			trv("c", data_in);
 			ldt_received(&data_in, sizeof(data_in));
 		}
 	} else {
 		while (kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
 			trl_();
 			trvd(data_out);
-			ldt_port_put(&data_out, sizeof(data_out));
+			ldt_send(&data_out, sizeof(data_out));
 		}
 	}
 	schedule_work(&ldt_work);
@@ -155,6 +167,10 @@ _entry:
 }
 
 DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
+
+/*
+ *	interrupt
+ */
 
 irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -170,6 +186,10 @@ _entry:
 	return IRQ_HANDLED;	/* our IRQ */
 }
 
+/*
+ *	timer
+ */
+
 struct timer_list ldt_timer;
 void ldt_timer_func(unsigned long data)
 {
@@ -182,6 +202,10 @@ _entry:
 }
 
 DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
+
+/*
+ *	file_operations
+ */
 
 static int ldt_open(struct inode *inode, struct file *file)
 {
@@ -198,6 +222,10 @@ _entry:
 	trvd(ldt_work_counter);
 	return 0;
 }
+
+/*
+ *	read
+ */
 
 static DEFINE_MUTEX(read_lock);
 
@@ -231,6 +259,10 @@ exit:
 	return ret ? ret : copied;
 }
 
+/*
+ *	write
+ */
+
 static DEFINE_MUTEX(write_lock);
 
 static ssize_t ldt_write(struct file *file, const char __user * buf, size_t count, loff_t * ppos)
@@ -247,6 +279,10 @@ _entry:
 	tasklet_schedule(&ldt_tasklet);
 	return ret ? ret : copied;
 }
+
+/*
+ *	polling
+ */
 
 static unsigned int ldt_poll(struct file *file, poll_table * pt)
 {
@@ -281,6 +317,9 @@ void pages_flag(struct page *page, int pages, int mask, int value)
 			__clear_bit(mask, &page->flags);
 }
 
+/*
+ *	mmap
+ */
 static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	void *buf = NULL;
@@ -298,6 +337,10 @@ _entry:
 	}
 	return 0;
 }
+
+/*
+ *	ioctl
+ */
 
 long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 {
@@ -344,6 +387,10 @@ static struct miscdevice ldt_miscdev = {
 	&ldt_fops,
 };
 
+/*
+ *	kthread
+ */
+
 int ldt_thread_sub(void *data)
 {
 	int ret = 0;
@@ -373,48 +420,56 @@ _entry:
 	return ret;
 }
 
+/*
+ *	UART
+ */
+
 int uart_probe(void)
 {
 	int ret = 0;
-	if (portn) {
-		if (!request_region(portn, 8, KBUILD_MODNAME)) {
-			printk(KERN_WARNING "portn is already used\n");
+	if (port) {
+		if (!request_region(port, 8, KBUILD_MODNAME)) {
+			printk(KERN_WARNING "port is already used\n");
 		}
 	}
 	if (irq) {
 		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
-		outb(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, portn + UART_MCR);
-		uart_detected = (inb(portn + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
-		trvx(inb(portn + UART_MSR));
+		outb(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port + UART_MCR);
+		uart_detected = (inb(port + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
+		trvx(inb(port + UART_MSR));
 
 		if (uart_detected) {
-			//outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, portn + UART_IER);
-			outb(UART_IER_RDI | UART_IER_RLSI, portn + UART_IER);
-			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, portn + UART_MCR);
-			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, portn + UART_FCR);
+			//outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port + UART_IER);
+			outb(UART_IER_RDI | UART_IER_RLSI, port + UART_IER);
+			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port + UART_MCR);
+			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port + UART_FCR);
 			trvd(loopback);
 			if (loopback)
-				outb(inb(portn + UART_MCR) | UART_MCR_LOOP, portn + UART_MCR);
+				outb(inb(port + UART_MCR) | UART_MCR_LOOP, port + UART_MCR);
 		}
 		if (!uart_detected && loopback) {
-			printk(KERN_WARNING"Emulating loopback is software\n");
+			printk(KERN_WARNING "Emulating loopback is software\n");
 		}
 
 	}
 	trvx(uart_detected);
-	trvx_(inb(portn + UART_IER));
-	trvx_(inb(portn + UART_IIR));
-	trvx_(inb(portn + UART_FCR));
+	trvx_(inb(port + UART_IER));
+	trvx_(inb(port + UART_IIR));
+	trvx_(inb(port + UART_FCR));
 	trln();
-	trvx_(inb(portn + UART_LCR));
-	trvx_(inb(portn + UART_MCR));
-	trvx_(inb(portn + UART_LSR));
-	trvx_(inb(portn + UART_MSR));
+	trvx_(inb(port + UART_LCR));
+	trvx_(inb(port + UART_MCR));
+	trvx_(inb(port + UART_LSR));
+	trvx_(inb(port + UART_MSR));
 	trln();
 	return ret;
 }
 
 static struct task_struct *thread;
+
+/*
+ *	ldt_probe - main initialization function
+ */
 
 static __devinit int ldt_probe(struct platform_device *pdev)
 {
@@ -471,6 +526,10 @@ exit:
 	return ret;
 }
 
+/*
+ *	ldt_remove - main clean up function
+ */
+
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 _entry:
@@ -483,10 +542,10 @@ _entry:
 	}
 	del_timer(&ldt_timer);
 	if (irq) {
-		outb(0, portn + UART_IER);
-		outb(0, portn + UART_FCR);
-		outb(0, portn + UART_FCR);
-		inb(portn + UART_RX);
+		outb(0, port + UART_IER);
+		outb(0, port + UART_FCR);
+		outb(0, port + UART_MCR);
+		inb(port + UART_RX);
 		free_irq(irq, THIS_MODULE);
 	}
 	tasklet_kill(&ldt_tasklet);
@@ -545,7 +604,7 @@ module_exit(ldt_exit);
 #else // ! USE_PLATFORM_DEVICE
 
 /*
- * Standalone module initialization to run without platform_device
+ *	Standalone module initialization to run without platform_device
  */
 
 static int ldt_init(void)
@@ -553,7 +612,7 @@ static int ldt_init(void)
 	int ret = 0;
 _entry:
 	/*
-	 * Call probe function directly, bypassing platform_device infrastructure
+	 *      Call probe function directly, bypassing platform_device infrastructure
 	 */
 	ret = ldt_probe(NULL);
 	return ret;
