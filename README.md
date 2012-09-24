@@ -2,7 +2,15 @@
 
 LDT project is useful for Linux driver development beginners and as starting point for a new drivers. 
 The driver uses following Linux facilities: 
-module, platform driver, file operations (read/write, mmap, ioctl, blocking and nonblocking mode, polling), kfifo, completion, interrupt, tasklet, work, kthread, timer, misc device, proc fs, UART 0x3f8, HW loopback, SW loopback
+module, platform driver, file operations (read/write, mmap, ioctl, blocking and nonblocking mode, polling), kfifo, completion, interrupt, tasklet, work, kthread, timer, misc device, proc fs, UART 0x3f8, HW loopback, SW loopback.
+
+## Usage:
+
+Just run
+
+git clone git://github.com/makelinux/ldt.git && cd ldt && ./ldt-test
+
+and explore sources.
 
 ## Files:
 
@@ -13,15 +21,8 @@ Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/l
 
 Generic testing utility for Device I/O: **[dio.c](https://github.com/makelinux/ldt/blob/master/dio.c)**
 
-Browse the rest source: https://github.com/makelinux/ldt/
+Browse the rest of source: https://github.com/makelinux/ldt/
 
-## Usage:
-
-Just run
-
-git clone git://github.com/makelinux/ldt.git && cd ldt && ./ldt-test
-
-and explore sources
 
 ## Compiled and tested on Linux versions:
 
