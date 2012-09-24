@@ -3,7 +3,7 @@
  *
  *	stdin/stdout <--> dio <--> mmap, ioctl, read/write
  *
- *	Copyright (C) 2012 Constantine Shulyupin <const@makelinux.net> 
+ *	Copyright (C) 2012 Constantine Shulyupin <const@makelinux.net>
  *	http://www.makelinux.net/
  *
  *	Dual BSD/GPL License
@@ -43,8 +43,12 @@ static int mmapoffset;
 static char *dev_name;
 static int ignore_eof;
 static int ioctl_num;
+static int loops;
+static int delay;
 static char ioctl_type = 'A';
 __thread int ret;
+
+//#define VERBOSE
 
 int output(int dev, void *buf, int size)
 {
@@ -99,7 +103,7 @@ int input(int dev, void *buf, int size)
 int io_start(int dev)
 {
 	struct pollfd pfd[2];
-	ssize_t data_in_len, len_total = 0;
+	ssize_t data_in_len, data_out_len, len_total = 0;
 	int i = 0;
 	pfd[0].fd = fileno(stdin);
 	pfd[0].events = POLLIN;
@@ -112,7 +116,6 @@ int io_start(int dev)
 		trvx_(pfd[1].revents);
 		trln();
 #endif
-		i++;
 		data_in_len = 0;
 		if (pfd[0].revents & POLLIN) {
 			pfd[0].revents = 0;
@@ -121,7 +124,7 @@ int io_start(int dev)
 				usleep(100000);
 				break;
 			}
-			if (!data_in_len) {
+			if (!data_in_len && !ignore_eof ) {
 				// read returns 0 on End Of File
 				break;
 			}
@@ -135,43 +138,53 @@ again:
 				usleep(100000);
 				goto again;
 			}
+			if (data_in_len > 0)
+				len_total += data_in_len;
 		}
+		data_out_len = 0;
 		if (pfd[1].revents & POLLIN) {
 			pfd[1].revents = 0;
-			chkne(ret = data_in_len = input(dev, outbuf, buf_size));
-			if (data_in_len < 0) {
+			chkne(ret = data_out_len = input(dev, outbuf, buf_size));
+			if (data_out_len < 0) {
 				usleep(100000);
 				break;
 			}
-			if (!data_in_len) {
+			if (!data_out_len) {
 				// EOF, dont extect data from the file any more
 				// but wee can continue to write
 				pfd[1].events = 0;
 			}
-			if (!data_in_len && !ignore_eof) {
+			if (!data_out_len && !ignore_eof) {
 				// read returns 0 on End Of File
 				break;
 			}
-#if VERBOSE
-			trl_();
-			trvd_(data_in_len);
-			trln();
-#endif
-			write(fileno(stdout), outbuf, data_in_len);
+			write(fileno(stdout), outbuf, data_out_len);
+			if (data_out_len > 0)
+				len_total += data_out_len;
 		}
-		if (data_in_len > 0)
-			len_total += data_in_len;
-#if VERBOSE2
+#ifdef VERBOSE
 		trl_();
 		trvd_(i);
 		trvd_(len_total);
 		trvd_(data_in_len);
+		trvd_(data_out_len);
 		trln();
 #endif
-		if (pfd[0].revents & POLLHUP || pfd[1].revents & POLLHUP)
+		if ((!ignore_eof && pfd[0].revents & POLLHUP) || pfd[1].revents & POLLHUP)
 			break;
-		//usleep(1000 * delay);
+		i++;
+		if ( loops && i >= loops )
+			break;
+		usleep(1000 * delay);
 	}
+#ifdef VERBOSE
+		trl_();
+		trvd_(i);
+		trvd_(len_total);
+		trvd_(data_in_len);
+		trvd_(data_out_len);
+		trln();
+#endif
 	return ret;
 }
 
@@ -197,6 +210,8 @@ int options_init()
 	add_literal_option(buf_size);
 	add_literal_option(ioctl_num);
 	add_literal_option(ioctl_type);
+	add_literal_option(loops);
+	add_literal_option(delay);
 	add_flag_option("ioctl", &io_type, ioctl_io);
 	add_flag_option("mmap", &io_type, mmap_io);
 	add_flag_option("file", &io_type, file_io);
