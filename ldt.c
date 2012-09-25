@@ -51,10 +51,12 @@ static void *out_buf;
 static int uart_detected;
 
 // TODO: move to ldt_platform_device
-int port = 0x3f8;		/* UART port */
+static int port;
 module_param(port, int, 0);
+static int port_size;
+module_param(port_size, int, 0);
 
-static int irq = 4;
+static int irq;
 module_param(irq, int, 0);
 
 static int loopback;
@@ -145,6 +147,7 @@ _entry:
 		while ((inb(port + UART_LSR) & UART_LSR_THRE)
 		       && (ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock))) {
 			trl_();
+			trvx_(inb(port + UART_LSR));
 			trvd_(data_out);
 			trv("c", data_out);
 			ldt_send(&data_out, sizeof(data_out));
@@ -152,6 +155,7 @@ _entry:
 		while (inb(port + UART_LSR) & UART_LSR_DR) {
 			data_in = inb(port + UART_RX);
 			trl_();
+			trvx_(inb(port + UART_LSR));
 			trvd_(data_in);
 			trv("c", data_in);
 			ldt_received(&data_in, sizeof(data_in));
@@ -182,6 +186,9 @@ _entry:
 	trl();
 	once(print_context());
 	isr_counter++;
+	if ( ! ( inb(port + UART_IIR) & UART_IIR_NO_INT ) ) {
+		trvx_(inb(port + UART_IIR)); 
+	}
 	tasklet_schedule(&ldt_tasklet);
 	//return IRQ_NONE;      /* not our IRQ */
 	return IRQ_HANDLED;	/* our IRQ */
@@ -425,13 +432,14 @@ _entry:
  *	UART
  */
 
+static struct resource *port_r;
 int uart_probe(void)
 {
 	int ret = 0;
 	if (port) {
-		if (!request_region(port, 8, KBUILD_MODNAME)) {
-			printk(KERN_WARNING "port is already used\n");
-		}
+		port_r = request_region(port, port_size, KBUILD_MODNAME);
+		trvp(port_r);
+		/* ignore error */
 	}
 	if (irq) {
 		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
@@ -502,9 +510,15 @@ _entry:
 	if (pdev) {
 		data = pdev->dev.platform_data;
 		r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-		if (!irq) {
+		if (r && !irq) {
 			irq = r->start;
 		}
+		r = platform_get_resource(pdev, IORESOURCE_IO, 0);
+		if (r && !port)
+			port = r->start;
+
+		if (r && !port_size)
+			port_size = resource_size(r);
 	}
 	trvp(data);
 	trvs(data);
@@ -542,6 +556,9 @@ _entry:
 		kthread_stop(thread);
 	}
 	del_timer(&ldt_timer);
+	if (port_r) {
+		release_region(port, port_size);
+	}
 	if (irq) {
 		outb(0, port + UART_IER);
 		outb(0, port + UART_FCR);

@@ -19,9 +19,14 @@
 
 static struct resource ldt_resource[] = {
 	{
+	 .flags = IORESOURCE_IO,
+	 .start = 0x3f8,
+	 .end = 0x3ff,
+	 },
+	{
 	 .flags = IORESOURCE_IRQ,
-	 .start = 0,
-	 .end = 0,
+	 .start = 4,
+	 .end = 4,
 	 },
 	{
 	 .flags = IORESOURCE_MEM,

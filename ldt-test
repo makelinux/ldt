@@ -47,15 +47,21 @@ tracing_stop()
 sudo dmesg -n 7
 sudo rmmod ldt ldt_plat_dev 2> /dev/null
 stty -F /dev/ttyS0 115200
-set -o errexit
 make -s
+set -o errexit
+
+#
+# Check for presence looback on /dev/ttyS0.
+# If loopback is not present, switch loopback on in the driver
+#
+
 data='loopback?'
 received=`echo $data | ./dio  --ignore_eof --loops 2 --delay 10 /dev/ttyS0`
 if [ "$data" == "$received" ]; then
 echo -e "Loopback on /dev/ttyS0 detected"
 loopback=0
 else
-echo -e "No loopback on /dev/ttyS0 detected, running ldt driver with UART loopback mode"
+echo -e "No loopback on /dev/ttyS0 detected, running ldt driver with UART in loopback mode"
 loopback=1
 fi
 junk=`echo | ./dio  --ignore_eof --loops 10 --delay 10 /dev/ttyS0`
