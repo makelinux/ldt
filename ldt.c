@@ -153,9 +153,9 @@ _entry:
 			ldt_send(&data_out, sizeof(data_out));
 		}
 		while (inb(port + UART_LSR) & UART_LSR_DR) {
-			data_in = inb(port + UART_RX);
 			trl_();
 			trvx_(inb(port + UART_LSR));
+			data_in = inb(port + UART_RX);
 			trvd_(data_in);
 			trv("c", data_in);
 			ldt_received(&data_in, sizeof(data_in));
@@ -201,9 +201,10 @@ void ldt_timer_func(unsigned long data)
 {
 _entry:
 	/*
-	 *      this timer is used just to fire ldt_tasklet, when there is no interrupt
+	 *      this timer is used just to fire ldt_tasklet, when there is no interrupt in loopback mode
 	 */
-	tasklet_schedule(&ldt_tasklet);
+	if (loopback)
+		tasklet_schedule(&ldt_tasklet);
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
 }
 
@@ -447,7 +448,7 @@ int uart_probe(void)
 
 		if (uart_detected) {
 			//outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port + UART_IER);
-			outb(UART_IER_RDI | UART_IER_RLSI, port + UART_IER);
+			outb(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port + UART_IER);
 			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port + UART_MCR);
 			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port + UART_FCR);
 			trvd(loopback);
