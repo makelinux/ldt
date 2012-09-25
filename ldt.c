@@ -137,6 +137,9 @@ DECLARE_WORK(ldt_work, ldt_work_func);
 
 static DECLARE_COMPLETION(ldt_complete);
 
+#define tx_ready()	(inb(port + UART_LSR) & UART_LSR_THRE)
+#define rx_ready()	(inb(port + UART_LSR) & UART_LSR_DR)
+
 void ldt_tasklet_func(unsigned long d)
 {
 	int ret;
@@ -144,15 +147,14 @@ void ldt_tasklet_func(unsigned long d)
 _entry:
 	once(print_context());
 	if (uart_detected) {
-		while ((inb(port + UART_LSR) & UART_LSR_THRE)
-		       && (ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock))) {
+		while (tx_ready() && (ret = kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock))) {
 			trl_();
 			trvx_(inb(port + UART_LSR));
 			trvd_(data_out);
 			trv("c", data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
-		while (inb(port + UART_LSR) & UART_LSR_DR) {
+		while (rx_ready()) {
 			trl_();
 			trvx_(inb(port + UART_LSR));
 			data_in = inb(port + UART_RX);
