@@ -183,12 +183,10 @@ _entry:
 	/*
 	 * UART interrupt is not called on loopback mode, therefore fire ldt_tasklet from timer too
 	 */
-	trl();
 	once(print_context());
 	isr_counter++;
-	if ( ! ( inb(port + UART_IIR) & UART_IIR_NO_INT ) ) {
-		trvx_(inb(port + UART_IIR)); 
-	}
+	trl_();
+	trvx(inb(port + UART_IIR));
 	tasklet_schedule(&ldt_tasklet);
 	//return IRQ_NONE;      /* not our IRQ */
 	return IRQ_HANDLED;	/* our IRQ */
