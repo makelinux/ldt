@@ -57,7 +57,7 @@ set -o errexit
 #
 
 data='loopback?'
-received=`echo $data | ./dio  --ignore_eof --loops 2 --delay 10 /dev/ttyS0`
+received=`echo $data | ./dio  --ignore_eof --loops 2 --delay 10 /dev/ttyS0 2> /dev/null`
 if [ "$data" == "$received" ]; then
 echo -e "Loopback on /dev/ttyS0 detected"
 loopback=0
@@ -65,7 +65,9 @@ else
 echo -e "No loopback on /dev/ttyS0 detected, running ldt driver with UART in loopback mode"
 loopback=1
 fi
-junk=`echo | ./dio  --ignore_eof --loops 10 --delay 10 /dev/ttyS0`
+
+# clean data
+echo | ./dio  --ignore_eof --loops 10 --delay 10 /dev/ttyS0 2> /dev/null > /dev/null
 
 sudo insmod ldt.ko loopback=$loopback
 sudo insmod ldt_plat_dev.ko
