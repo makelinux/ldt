@@ -46,6 +46,7 @@ tracing_stop()
 # sudo rmmod parport_pc parport  ppdev lp
 sudo dmesg -n 7
 sudo rmmod ldt ldt_plat_dev 2> /dev/null
+sudo dmesg -c > /dev/null
 stty -F /dev/ttyS0 115200
 make -s
 set -o errexit
@@ -92,6 +93,7 @@ sleep 0.5; echo $data > /dev/ldt;
 sleep 0.5
 kill %1; wait %1 2> /dev/null || true
 received=`cat R.tmp`
+rm -f R.tmp
 
 if [ "$data" == "$received" ]; then
 echo -e "${GREEN}LDT blocking read/write test passed$NOCOLOR"
@@ -121,7 +123,7 @@ echo expected $data
 echo received $received
 fi
 
-grep ldt /proc/interrupts || true
+#grep ldt /proc/interrupts || true
 tracing_stop || true
-sudo dmesg --show-delta --notime --read-clear 2>/dev/null > kernel.log || \
+sudo dmesg --notime --read-clear 2>/dev/null > kernel.log || \
 sudo dmesg -c > kernel.log && echo kernel.log saved

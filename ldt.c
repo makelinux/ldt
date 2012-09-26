@@ -21,7 +21,7 @@
  *	tasklet
  *	timer
  *	work
- * 	kthread
+ *	kthread
  *	misc device
  *	proc fs
  *	platform_driver and platform_device in another module
@@ -29,7 +29,7 @@
  *
  */
 
-#include <asm/io.h>
+#include <linux/io.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -50,7 +50,6 @@ static void *in_buf;
 static void *out_buf;
 static int uart_detected;
 
-// TODO: move to ldt_platform_device
 static int port;
 module_param(port, int, 0);
 static int port_size;
@@ -63,15 +62,16 @@ static int loopback;
 module_param(loopback, int, 0);
 
 /*
- *	print_context prints execution context: hard interrupt, soft interrupt or scheduled task
+ *	print_context prints execution context:
+ *	hard interrupt, soft interrupt or scheduled task
  */
 
 #define print_context()	\
-	printk(KERN_DEBUG"%s:%d %s %s %x\n", __file__, __LINE__, __func__, \
-			in_irq()?"hardirq":current->comm,preempt_count());
+	pr_debug("%s:%d %s %s 0x%x\n", __file__, __LINE__, __func__, \
+			(in_irq() ? "harirq" : current->comm), preempt_count());
 
 #define check(a) \
-( ret=a,((ret<0)?tracef("%s:%i %s FAIL\n\t%i=%s\n",__FILE__,__LINE__,__FUNCTION__,ret,#a):0),ret)
+(ret = a, ((ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n", __file__, __LINE__, __func__, ret, #a) : 0), ret)
 
 static int isr_counter;
 static int ldt_work_counter;
@@ -102,18 +102,14 @@ void ldt_received(void *data, int size)
 void ldt_send(void *data, int size)
 {
 	if (uart_detected) {
-		if (inb(port + UART_LSR) & UART_LSR_THRE) {
+		if (inb(port + UART_LSR) & UART_LSR_THRE)
 			outb(*(char *)data, port + UART_TX);
-		} else {
+		else
 			trlm("overflow");
-		}
-	} else {
-		/*
-		 * emulate loopback
-		 */
-		if (loopback)
-			ldt_received(data, size);
-	}
+	} else
+		/* emulate loopback  */
+	if (loopback)
+		ldt_received(data, size);
 }
 
 /*
@@ -182,14 +178,14 @@ irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 _entry:
 	/*
-	 * UART interrupt is not called on loopback mode, therefore fire ldt_tasklet from timer too
+	 *      UART interrupt is not fired in loopback mode,
+	 *      therefore fire ldt_tasklet from timer too
 	 */
 	once(print_context());
 	isr_counter++;
 	trl_();
 	trvx(inb(port + UART_IIR));
 	tasklet_schedule(&ldt_tasklet);
-	//return IRQ_NONE;      /* not our IRQ */
 	return IRQ_HANDLED;	/* our IRQ */
 }
 
@@ -202,7 +198,8 @@ void ldt_timer_func(unsigned long data)
 {
 _entry:
 	/*
-	 *      this timer is used just to fire ldt_tasklet, when there is no interrupt in loopback mode
+	 *      this timer is used just to fire ldt_tasklet,
+	 *      when there is no interrupt in loopback mode
 	 */
 	if (loopback)
 		tasklet_schedule(&ldt_tasklet);
@@ -237,12 +234,11 @@ _entry:
 
 static DEFINE_MUTEX(read_lock);
 
-static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff_t * ppos)
+static ssize_t ldt_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	int ret;
 	unsigned int copied;
 _entry:
-	// TODO: implement blocking I/O
 	if (kfifo_is_empty(&in_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			ret = -EAGAIN;
@@ -273,15 +269,14 @@ exit:
 
 static DEFINE_MUTEX(write_lock);
 
-static ssize_t ldt_write(struct file *file, const char __user * buf, size_t count, loff_t * ppos)
+static ssize_t ldt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	int ret;
 	unsigned int copied;
 _entry:
-	// TODO wait_event_interruptible ... ldt_writeable
-	if (mutex_lock_interruptible(&write_lock)) {
+	/* TODO: wait_event_interruptible ... ldt_writeable */
+	if (mutex_lock_interruptible(&write_lock))
 		return -EINTR;
-	}
 	ret = kfifo_from_user(&out_fifo, buf, count, &copied);
 	mutex_unlock(&write_lock);
 	tasklet_schedule(&ldt_tasklet);
@@ -292,19 +287,20 @@ _entry:
  *	polling
  */
 
-static unsigned int ldt_poll(struct file *file, poll_table * pt)
+static unsigned int ldt_poll(struct file *file, poll_table *pt)
 {
 	unsigned int mask = 0;
 _entry:
 	poll_wait(file, &ldt_readable, pt);
-	//poll_wait(file, ldt_writeable, pt); // TODO
+	/*poll_wait(file, ldt_writeable, pt); TODO */
 
-	if (!kfifo_is_empty(&in_fifo)) {
+	if (!kfifo_is_empty(&in_fifo))
 		mask |= POLLIN | POLLRDNORM;
-	}
 	mask |= POLLOUT | POLLWRNORM;
-	//mask |= POLLHUP; // on output eof
-	//mask |= POLLERR; // on output error
+#if 0
+	mask |= POLLHUP;	/* on output eof */
+	mask |= POLLERR;	/* on output error */
+#endif
 	trl_();
 	trvx(mask);
 	return mask;
@@ -378,7 +374,7 @@ _entry:
 	return 0;
 }
 
-struct file_operations ldt_fops = {
+static const struct file_operations ldt_fops = {
 	.owner = THIS_MODULE,
 	.open = ldt_open,
 	.release = ldt_release,
@@ -448,7 +444,7 @@ int uart_probe(void)
 		trvx(inb(port + UART_MSR));
 
 		if (uart_detected) {
-			//outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port + UART_IER);
+			/*outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port + UART_IER); */
 			outb(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port + UART_IER);
 			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port + UART_MCR);
 			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port + UART_FCR);
@@ -456,10 +452,8 @@ int uart_probe(void)
 			if (loopback)
 				outb(inb(port + UART_MCR) | UART_MCR_LOOP, port + UART_MCR);
 		}
-		if (!uart_detected && loopback) {
-			printk(KERN_WARNING "Emulating loopback is software\n");
-		}
-
+		if (!uart_detected && loopback)
+			pr_warn("Emulating loopback is software\n");
 	}
 	trvx(uart_detected);
 	trvx_(inb(port + UART_IER));
@@ -496,23 +490,23 @@ _entry:
 	trvd_(irq);
 	trvd_(bufsize);
 	trln();
-	if (!(in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO))) {
+	in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO);
+	if (!in_buf) {
 		ret = -ENOMEM;
 		goto exit;
 	}
 	pages_flag(virt_to_page(in_buf), PFN_UP(bufsize), PG_reserved, 1);
-	if (!(out_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO))) {
+	out_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO);
+	if (!out_buf) {
 		ret = -ENOMEM;
 		goto exit;
 	}
 	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
-	//ret = register_chrdev (0, KBUILD_MODNAME, &ldt_fops);
 	if (pdev) {
 		data = pdev->dev.platform_data;
 		r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-		if (r && !irq) {
+		if (r && !irq)
 			irq = r->start;
-		}
 		r = platform_get_resource(pdev, IORESOURCE_IO, 0);
 		if (r && !port)
 			port = r->start;
@@ -522,8 +516,10 @@ _entry:
 	}
 	trvp(data);
 	trvs(data);
+#if 0
+	ret = register_chrdev(0, KBUILD_MODNAME, &ldt_fops);
+#endif
 	ret = check(misc_register(&ldt_miscdev));
-	//ret = check(register_chrdev (0, KBUILD_MODNAME, &ldt_fops));
 	if (ret < 0)
 		goto exit;
 	trvd(ldt_miscdev.minor);
@@ -532,9 +528,8 @@ _entry:
 	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
 	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
-	if (IS_ERR(thread)) {
+	if (IS_ERR(thread))
 		ret = PTR_ERR(thread);
-	}
 exit:
 	trl_();
 	trvd(ret);
@@ -556,9 +551,8 @@ _entry:
 		kthread_stop(thread);
 	}
 	del_timer(&ldt_timer);
-	if (port_r) {
+	if (port_r)
 		release_region(port, port_size);
-	}
 	if (irq) {
 		outb(0, port + UART_IER);
 		outb(0, port + UART_FCR);
@@ -598,7 +592,8 @@ module_platform_driver(ldt_driver);
 #else
 
 /*
- *	for Linux kernel releases before v3.1-12 without macro module_platform_driver
+ *	for Linux kernel releases before v3.1-12
+ *	without macro module_platform_driver
  */
 
 static int ldt_init(void)
@@ -617,9 +612,9 @@ _entry:
 
 module_init(ldt_init);
 module_exit(ldt_exit);
-#endif // module_platform_driver
+#endif /* module_platform_driver */
 
-#else // ! USE_PLATFORM_DEVICE
+#else /* !USE_PLATFORM_DEVICE */
 
 /*
  *	Standalone module initialization to run without platform_device
@@ -630,7 +625,8 @@ static int ldt_init(void)
 	int ret = 0;
 _entry:
 	/*
-	 *      Call probe function directly, bypassing platform_device infrastructure
+	 *      Call probe function directly,
+	 *      bypassing platform_device infrastructure
 	 */
 	ret = ldt_probe(NULL);
 	return ret;

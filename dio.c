@@ -28,7 +28,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <assert.h>
-#include <asm/ioctl.h>
+#include <linux/ioctl.h>
 
 static enum io_type {
 	file_io,
@@ -48,7 +48,9 @@ static int delay;
 static char ioctl_type = 'A';
 __thread int ret;
 
-//#define VERBOSE
+/*
+#define VERBOSE
+*/
 
 int output(int dev, void *buf, int size)
 {
@@ -125,7 +127,7 @@ int io_start(int dev)
 				break;
 			}
 			if (!data_in_len && !ignore_eof) {
-				// read returns 0 on End Of File
+				/* read returns 0 on End Of File */
 				break;
 			}
 #ifdef VERBOSE
@@ -150,12 +152,12 @@ again:
 				break;
 			}
 			if (!data_out_len) {
-				// EOF, dont extect data from the file any more
-				// but wee can continue to write
+				/* EOF, don't expect data from the file any more
+				   but wee can continue to write */
 				pfd[1].events = 0;
 			}
 			if (!data_out_len && !ignore_eof) {
-				// read returns 0 on End Of File
+				/* read returns 0 on End Of File */
 				break;
 			}
 			write(fileno(stdout), outbuf, data_out_len);
@@ -189,12 +191,12 @@ again:
 }
 
 #define add_literal_option(o)  do { options[optnum].name = #o; \
-       options[optnum].flag = (void*)&o; options[optnum].has_arg = 1; \
-       options[optnum].val = -1; optnum++; } while (0)
+	options[optnum].flag = (void *)&o; options[optnum].has_arg = 1; \
+	options[optnum].val = -1; optnum++; } while (0)
 
-#define add_flag_option(n,p,v) do { options[optnum].name = n; \
-       options[optnum].flag = (void*)p; options[optnum].has_arg = 0; \
-       options[optnum].val = v; optnum++; } while (0)
+#define add_flag_option(n, p, v) do { options[optnum].name = n; \
+	options[optnum].flag = (void *)p; options[optnum].has_arg = 0; \
+	options[optnum].val = v; optnum++; } while (0)
 
 static struct option options[100];
 int optnum;
@@ -224,33 +226,37 @@ int options_init()
 	return optnum;
 }
 
-/* expand_arg, return_if_arg_is_equal - utility functions to translate command line parameters
+/*
+ * expand_arg, return_if_arg_is_equal - utility functions
+ * to translate command line parameters
  * from string to numeric values using predefined preprocessor defines
  */
 
-#define return_if_arg_is_equal(entry) if (0 == strcmp(arg,#entry)) return entry
+#define return_if_arg_is_equal(entry) do { if (0 == strcmp(arg, #entry)) return entry; } while (0)
 
 int expand_arg(char *arg)
 {
 	if (!arg)
 		return 0;
-	//return_if_arg_is_equal(SOCK_STREAM);
+/*
+	return_if_arg_is_equal(SOCK_STREAM);
+*/
 	return strtol(arg, NULL, 0);
 }
 
 char *usage = "dio - Device Input/Output utility\n\
 Usage:\n\
-       dio <options> <device file>\n\
+	dio <options> <device file>\n\
 \n\
 options:\n\
 \n\
 default values are marked with '*'\n\
 \n\
-       -h | --help\n\
-               show this help\n\
+	-h | --help\n\
+		show this help\n\
 \n\
-       --buf_size <n> \n\
-               I/O buffer size\n\
+	--buf_size <n> \n\
+		I/O buffer size\n\
 \n\
 Samples:\n\
 \n\
@@ -279,12 +285,10 @@ int init(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
-	if (optind < argc) {
+	if (optind < argc)
 		dev_name = argv[optind];
-	}
-	if (io_type == ioctl_io && buf_size >= 1 << _IOC_SIZEBITS) {
+	if (io_type == ioctl_io && buf_size >= 1 << _IOC_SIZEBITS)
 		fprintf(stderr, "WARNING: size of ioctl data it too big\n");
-	}
 	return 0;
 }
 

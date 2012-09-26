@@ -1,6 +1,6 @@
 /*
  *	LDT - Linux Driver Template
- *	
+ *
  *	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
  *
  *	Dual BSD/GPL License
