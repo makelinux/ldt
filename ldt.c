@@ -503,6 +503,7 @@ _entry:
 	}
 	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
 	if (pdev) {
+		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
 		data = pdev->dev.platform_data;
 		r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 		if (r && !irq)
@@ -543,6 +544,8 @@ exit:
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 _entry:
+	if (pdev)
+		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
 	remove_proc_entry(KBUILD_MODNAME, NULL);
 
 	misc_deregister(&ldt_miscdev);

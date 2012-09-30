@@ -241,16 +241,7 @@ static inline int empty_function(void)
 
 #ifdef MODULE
 /* omit full absolute path for modules */
-static inline char *ctracer_file_name_no_path(char *fn)
-{
-	char *strrchr(const char *s, int c);
-
-	char *p = strrchr(fn, '/');
-	if (p)
-		return p + 1;
-	return fn;
-}
-
+#define ctracer_file_name_no_path(fn) (fn[0] != '/' ? fn : (strrchr(fn, '/') + 1))
 #define __file__	ctracer_file_name_no_path(__FILE__)
 #else
 #define __file__	__FILE__

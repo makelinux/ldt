@@ -34,4 +34,4 @@ endif
 _src=dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h
 
 checkpatch:
-	checkpatch.pl --no-tree --show-types --ignore LONG_LINE,LINE_CONTINUATIONS --terse -f $(_src) Makefile
+	/usr/src/linux-headers-$(shell uname -r)/scripts/checkpatch.pl --no-tree --show-types --ignore LONG_LINE,LINE_CONTINUATIONS --terse -f $(_src) Makefile
