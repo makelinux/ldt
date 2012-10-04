@@ -27,6 +27,12 @@
  *	platform_driver and platform_device in another module
  *	simple UART driver on port 0x3f8 with IRQ 4
  *
+ *	TODO:
+ *	multiple devices
+ *	classic tracing
+ *	linked list
+ *	debugfs
+ *
  */
 
 #include <linux/io.h>
@@ -82,14 +88,14 @@ static DEFINE_KFIFO(out_fifo, char, FIFO_SIZE);
 
 static DECLARE_WAIT_QUEUE_HEAD(ldt_readable);
 
-spinlock_t fifo_lock;
+static spinlock_t fifo_lock;
 
 /*
  *	ldt_received - called with data received from HW port
  *	Called from tasklet, which is fired from ISR or timer
  */
 
-void ldt_received(void *data, int size)
+static void ldt_received(void *data, int size)
 {
 	kfifo_in_spinlocked(&in_fifo, data, size, &fifo_lock);
 	wake_up_interruptible(&ldt_readable);
@@ -99,7 +105,7 @@ void ldt_received(void *data, int size)
  *	ldt_send - send data to HW port or emulated SW loopback
  */
 
-void ldt_send(void *data, int size)
+static void ldt_send(void *data, int size)
 {
 	if (uart_detected) {
 		if (inb(port + UART_LSR) & UART_LSR_THRE)
@@ -118,7 +124,7 @@ void ldt_send(void *data, int size)
 
 /* Fictive label _entry is used for tracing */
 
-void ldt_work_func(struct work_struct *work)
+static void ldt_work_func(struct work_struct *work)
 {
 _entry:;
 	once(print_context());
@@ -136,7 +142,7 @@ static DECLARE_COMPLETION(ldt_complete);
 #define tx_ready()	(inb(port + UART_LSR) & UART_LSR_THRE)
 #define rx_ready()	(inb(port + UART_LSR) & UART_LSR_DR)
 
-void ldt_tasklet_func(unsigned long d)
+static void ldt_tasklet_func(unsigned long d)
 {
 	char data_out, data_in;
 _entry:
@@ -168,13 +174,13 @@ _entry:
 	complete(&ldt_complete);
 }
 
-DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
+static DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
 
 /*
  *	interrupt
  */
 
-irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 _entry:
 	/*
@@ -193,8 +199,8 @@ _entry:
  *	timer
  */
 
-struct timer_list ldt_timer;
-void ldt_timer_func(unsigned long data)
+static struct timer_list ldt_timer;
+static void ldt_timer_func(unsigned long data)
 {
 _entry:
 	/*
@@ -206,7 +212,7 @@ _entry:
 	mod_timer(&ldt_timer, jiffies + HZ / 100);
 }
 
-DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
+static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 
 /*
  *	file_operations
@@ -346,7 +352,7 @@ _entry:
  *	ioctl
  */
 
-long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
+static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 {
 	void __user *user = (void *)arg;
 _entry:
@@ -395,7 +401,7 @@ static struct miscdevice ldt_miscdev = {
  *	kthread
  */
 
-int ldt_thread_sub(void *data)
+static int ldt_thread_sub(void *data)
 {
 	int ret = 0;
 _entry:
@@ -405,7 +411,7 @@ _entry:
 	return ret;
 }
 
-int ldt_thread(void *data)
+static int ldt_thread(void *data)
 {
 	int ret = 0;
 _entry:
@@ -429,7 +435,7 @@ _entry:
  */
 
 static struct resource *port_r;
-int uart_probe(void)
+static int uart_probe(void)
 {
 	int ret = 0;
 	if (port) {
@@ -503,11 +509,10 @@ _entry:
 	}
 	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
 	if (pdev) {
-		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
+		dev_dbg(&pdev->dev, "%s:%d %s attaching driver\n", __file__, __LINE__, __func__);
 		data = pdev->dev.platform_data;
-		r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-		if (r && !irq)
-			irq = r->start;
+		if (!irq)
+			irq = platform_get_irq(pdev, 0);
 		r = platform_get_resource(pdev, IORESOURCE_IO, 0);
 		if (r && !port)
 			port = r->start;
@@ -526,7 +531,7 @@ _entry:
 	trvd(ldt_miscdev.minor);
 	isr_counter = 0;
 	uart_probe();
-	proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops);
+	/* proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops); depricated */
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
 	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
 	if (IS_ERR(thread))
@@ -546,7 +551,7 @@ static int __devexit ldt_remove(struct platform_device *pdev)
 _entry:
 	if (pdev)
 		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
-	remove_proc_entry(KBUILD_MODNAME, NULL);
+	/* remove_proc_entry(KBUILD_MODNAME, NULL); depricated */
 
 	misc_deregister(&ldt_miscdev);
 	if (!IS_ERR(thread)) {

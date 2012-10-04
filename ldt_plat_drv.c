@@ -34,7 +34,7 @@ _entry:
 }
 
 static struct platform_driver ldt_plat_driver = {
-	.driver.name = "ldt_plat_device_name",
+	.driver.name = "ldt_device_name",
 	.driver.owner = THIS_MODULE,
 	.probe = ldt_plat_probe,
 	.remove = __devexit_p(ldt_plat_remove),

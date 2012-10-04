@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#
 #	LDT - Linux Driver Template
 #
 #	Test script
@@ -7,6 +8,7 @@
 #	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
 #
 #	Dual BSD/GPL License
+#
 
 RED="\\033[0;31m"
 NOCOLOR="\\033[0;39m"
@@ -28,16 +30,16 @@ tracing()
 tracing_start()
 {
 	tracing "echo :mod:ldt > set_ftrace_filter"
-	tracing "echo function > current_tracer"
+	tracing "echo function > current_tracer" # need for draw_functrace.py
 	#tracing "echo function_graph > current_tracer"
 	tracing "echo 1 > function_profile_enabled"
+	# useful stuff:
 	#tracing "echo XXX > set_ftrace_notrace"
 	#sudo cat $tracing/current_tracer
 	#sudo cat $tracing/set_ftrace_filter
 	#sudo cat $tracing/function_profile_enabled
 	# available_filter_functions 
 	# echo $$ > set_ftrace_pid
-
 }
 
 tracing_stop()
@@ -50,6 +52,7 @@ tracing_stop()
 	sudo dd iflag=nonblock if=$tracing/trace_pipe 2> /dev/null > trace_pipe.log || true && echo trace_pipe.log saved
 	tracing "echo nop > current_tracer"
 	#export PYTHONPATH=/usr/src/linux-headers-$(uname -r)/scripts/tracing/
+	# draw_functrace.py needs function tracer
 	python /usr/src/linux-headers-$(uname -r)/scripts/tracing/draw_functrace.py \
 		< trace_pipe.log > functrace.log && echo functrace.log saved || true
 }
