@@ -139,6 +139,7 @@ echo expected $data
 echo received $received
 fi
 
+sudo ls -l /sys/kernel/debug/ldt
 #grep ldt /proc/interrupts || true
 tracing_stop || true
 sudo dmesg --notime --read-clear 2>/dev/null > kernel.log || \

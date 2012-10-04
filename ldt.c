@@ -23,7 +23,7 @@
  *	work
  *	kthread
  *	misc device
- *	proc fs
+ *	debugfs
  *	platform_driver and platform_device in another module
  *	simple UART driver on port 0x3f8 with IRQ 4
  *
@@ -31,7 +31,6 @@
  *	multiple devices
  *	classic tracing
  *	linked list
- *	debugfs
  *
  */
 
@@ -50,6 +49,7 @@
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
 #include <linux/serial_reg.h>
+#include <linux/debugfs.h>
 
 static int bufsize = PFN_ALIGN(16 * 1024);
 static void *in_buf;
@@ -475,6 +475,7 @@ static int uart_probe(void)
 }
 
 static struct task_struct *thread;
+static struct dentry * debugfs;
 
 /*
  *	ldt_probe - main initialization function
@@ -536,6 +537,7 @@ _entry:
 	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
 	if (IS_ERR(thread))
 		ret = PTR_ERR(thread);
+	debugfs = debugfs_create_file(KBUILD_MODNAME, S_IRUGO, NULL, NULL, &ldt_fops);
 exit:
 	trl_();
 	trvd(ret);
@@ -552,7 +554,8 @@ _entry:
 	if (pdev)
 		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
 	/* remove_proc_entry(KBUILD_MODNAME, NULL); depricated */
-
+	if (debugfs)
+		debugfs_remove(debugfs);	
 	misc_deregister(&ldt_miscdev);
 	if (!IS_ERR(thread)) {
 		send_sig(SIGINT, thread, 1);
