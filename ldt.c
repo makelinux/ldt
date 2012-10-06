@@ -22,13 +22,14 @@
  *	timer
  *	work
  *	kthread
- *	misc device
+ *	simple single misc device file (miscdevice, misc_register)
+ *	multiple char device files (alloc_chrdev_region)
  *	debugfs
  *	platform_driver and platform_device in another module
  *	simple UART driver on port 0x3f8 with IRQ 4
+ *	Device Model (class, device)
  *
  *	TODO:
- *	multiple devices
  *	classic tracing
  *	linked list
  *
@@ -50,7 +51,9 @@
 #include <linux/platform_device.h>
 #include <linux/serial_reg.h>
 #include <linux/debugfs.h>
+#include <linux/cdev.h>
 
+static char ldt_name[] = KBUILD_MODNAME;
 static int bufsize = PFN_ALIGN(16 * 1024);
 static void *in_buf;
 static void *out_buf;
@@ -222,6 +225,8 @@ static int ldt_open(struct inode *inode, struct file *file)
 {
 _entry:
 	trl_();
+	trvd_(imajor(inode));
+	trvd_(iminor(inode));
 	trvx(file->f_flags & O_NONBLOCK);
 	return 0;
 }
@@ -229,6 +234,9 @@ _entry:
 static int ldt_release(struct inode *inode, struct file *file)
 {
 _entry:
+	trl_();
+	trvd_(iminor(inode));
+	trvd_(imajor(inode));
 	trvd(isr_counter);
 	trvd(ldt_work_counter);
 	return 0;
@@ -391,11 +399,36 @@ static const struct file_operations ldt_fops = {
 	.unlocked_ioctl = ldt_ioctl,
 };
 
+#ifdef USE_MISCDEV
+/*
+ *	use miscdevice for single instance device
+ */
 static struct miscdevice ldt_miscdev = {
 	MISC_DYNAMIC_MINOR,
-	KBUILD_MODNAME,
+	ldt_name,
 	&ldt_fops,
 };
+#else
+/*
+ *	used cdev and device for multiple instances device
+ */
+
+static int devs = 8;
+module_param(devs, int, 0);
+
+static struct cdev ldt_cdev;
+static struct class *ldt_class;
+static struct device *ldt_dev;
+#if 0
+static char *ldt_devnode(struct device *dev, umode_t *mode)
+{
+	if (mode)
+		*mode = S_IRUGO | S_IWUGO;
+	/* *mode = 0666; */
+	return NULL;
+}
+#endif
+#endif
 
 /*
  *	kthread
@@ -439,12 +472,12 @@ static int uart_probe(void)
 {
 	int ret = 0;
 	if (port) {
-		port_r = request_region(port, port_size, KBUILD_MODNAME);
+		port_r = request_region(port, port_size, ldt_name);
 		trvp(port_r);
 		/* ignore error */
 	}
 	if (irq) {
-		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE));
+		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, ldt_name, THIS_MODULE));
 		outb(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port + UART_MCR);
 		uart_detected = (inb(port + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
 		trvx(inb(port + UART_MSR));
@@ -475,7 +508,30 @@ static int uart_probe(void)
 }
 
 static struct task_struct *thread;
-static struct dentry * debugfs;
+static struct dentry *debugfs;
+static int major;
+
+int chrdev_region_init(char *dev_name)
+{
+	int ret;
+	int d;
+	dev_t devid;
+_entry:
+	devid = MKDEV(major, 0);
+	ret = check(alloc_chrdev_region(&devid, 0, devs, dev_name));
+	major = MAJOR(devid);
+	trvd(major);
+	cdev_init(&ldt_cdev, &ldt_fops);
+	check(cdev_add(&ldt_cdev, MKDEV(major, 0), devs));
+	ldt_class = class_create(THIS_MODULE, dev_name);
+	/* ldt_class->devnode = ldt_devnode; */
+	ldt_dev = device_create(ldt_class, NULL, devid, NULL, "%s", dev_name);
+	for (d = 1; d < devs; d++)
+		device_create(ldt_class, NULL, MKDEV(major, d), NULL, "%s%d", dev_name, d);
+	trvd(IS_ERR(ldt_dev));
+	trvp(ldt_dev);
+	return major;
+}
 
 /*
  *	ldt_probe - main initialization function
@@ -523,21 +579,25 @@ _entry:
 	}
 	trvp(data);
 	trvs(data);
-#if 0
-	ret = register_chrdev(0, KBUILD_MODNAME, &ldt_fops);
-#endif
+	isr_counter = 0;
+	uart_probe();
+	/* proc_create(ldt_name, 0, NULL, &ldt_fops); depricated */
+	mod_timer(&ldt_timer, jiffies + HZ / 10);
+	thread = kthread_run(ldt_thread, NULL, "%s", ldt_name);
+	if (IS_ERR(thread)) {
+		ret = PTR_ERR(thread);
+		if (ret)
+			goto exit;
+	}
+	debugfs = debugfs_create_file(ldt_name, S_IRUGO, NULL, NULL, &ldt_fops);
+#ifdef USE_MISCDEV
 	ret = check(misc_register(&ldt_miscdev));
 	if (ret < 0)
 		goto exit;
 	trvd(ldt_miscdev.minor);
-	isr_counter = 0;
-	uart_probe();
-	/* proc_create(KBUILD_MODNAME, 0, NULL, &ldt_fops); depricated */
-	mod_timer(&ldt_timer, jiffies + HZ / 10);
-	thread = kthread_run(ldt_thread, NULL, "%s", KBUILD_MODNAME);
-	if (IS_ERR(thread))
-		ret = PTR_ERR(thread);
-	debugfs = debugfs_create_file(KBUILD_MODNAME, S_IRUGO, NULL, NULL, &ldt_fops);
+#else
+	chrdev_region_init(ldt_name);
+#endif
 exit:
 	trl_();
 	trvd(ret);
@@ -550,14 +610,23 @@ exit:
 
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
+	int d;
 _entry:
 	if (pdev)
 		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
-	/* remove_proc_entry(KBUILD_MODNAME, NULL); depricated */
+	/* remove_proc_entry(ldt_name, NULL); depricated */
 	if (debugfs)
-		debugfs_remove(debugfs);	
+		debugfs_remove(debugfs);
+#ifdef USE_MISCDEV
 	misc_deregister(&ldt_miscdev);
-	if (!IS_ERR(thread)) {
+#else
+	for (d = 0; d < devs; d++)
+		device_destroy(ldt_class, MKDEV(major, d));
+	class_destroy(ldt_class);
+	cdev_del(&ldt_cdev);
+	unregister_chrdev_region(MKDEV(major, 0), devs);
+#endif
+	if (!IS_ERR_OR_NULL(thread)) {
 		send_sig(SIGINT, thread, 1);
 		kthread_stop(thread);
 	}

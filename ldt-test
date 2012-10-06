@@ -89,8 +89,10 @@ sudo insmod ldt_plat_dev.ko
 tracing_start || true
 # lsmod  | grep ldt
 #id=`grep -w ldt /proc/misc | cut -c -3`
-. /sys/class/misc/ldt/uevent # get $MAJOR $MINOR
-sudo sh -c "rm /dev/ldt;sudo mknod /dev/ldt c $MAJOR $MINOR; chmod o+rw /dev/ldt"
+. /sys/class/misc/ldt/uevent || true # get $MAJOR $MINOR
+. /sys/class/ldt/ldt/uevent || true # get $MAJOR $MINOR
+#sudo sh -c "rm /dev/ldt;sudo mknod /dev/ldt c $MAJOR $MINOR; chmod o+rw /dev/ldt"
+sudo sh -c "chmod go+rw /dev/ldt*"
 data=123rw
 echo $data > /dev/ldt
 sleep 0.5
@@ -141,6 +143,9 @@ fi
 
 sudo ls -l /sys/kernel/debug/ldt
 #grep ldt /proc/interrupts || true
+
+#sudo rmmod ldt ldt_plat_dev 2> /dev/null
+
 tracing_stop || true
 sudo dmesg --notime --read-clear 2>/dev/null > kernel.log || \
 sudo dmesg -c > kernel.log && echo kernel.log saved

@@ -3,6 +3,7 @@ ccflags-y+=-include $M/ctracer.h
 ccflags-y+=-D DEBUG
 ccflags-y+=-D CTRACER_ON
 ccflags-y+=-D USE_PLATFORM_DEVICE
+#ccflags-y+=-D USE_MISCDEV # uncomment to use single misc device instead char devices region
 
 obj-m+= ldt.o
 obj-m+= ldt_plat_drv.o # implements platform_driver only

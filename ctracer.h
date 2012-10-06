@@ -46,7 +46,7 @@ extern __thread int ret;
 #define trla(fmt, args...) tracef("%s:%i %s "fmt, __file__, __LINE__, __func__, ## args)
 #define trv(t, v) tracef(#v" = %"t EOL, v)
 #define trv_(t, v) tracef(#v" = %"t" ", v)
-#define trvd(d) trv("d", d)
+#define trvd(d) trv("d", (int)d)
 #define trvd_(d) trv_("d", d)
 #define trvx_(x) tracef(#x" = 0x%x ", (int)x)
 #define trvx(x) tracef(#x" = 0x%x"EOL, (int)x)
