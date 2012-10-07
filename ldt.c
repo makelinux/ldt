@@ -32,6 +32,7 @@
  *	TODO:
  *	classic tracing
  *	linked list
+ *	private instance state struct
  *
  */
 
@@ -235,8 +236,8 @@ static int ldt_release(struct inode *inode, struct file *file)
 {
 _entry:
 	trl_();
-	trvd_(iminor(inode));
 	trvd_(imajor(inode));
+	trvd_(iminor(inode));
 	trvd(isr_counter);
 	trvd(ldt_work_counter);
 	return 0;
@@ -491,8 +492,10 @@ static int uart_probe(void)
 			if (loopback)
 				outb(inb(port + UART_MCR) | UART_MCR_LOOP, port + UART_MCR);
 		}
-		if (!uart_detected && loopback)
+		if (!uart_detected && loopback) {
 			pr_warn("Emulating loopback is software\n");
+			ret = -ENODEV;
+		}
 	}
 	trvx(uart_detected);
 	trvx_(inb(port + UART_IER));
@@ -547,7 +550,7 @@ _entry:
 	trl_();
 	trvs_(__DATE__);
 	trvs_(__TIME__);
-	trvs_(KBUILD_MODNAME);
+	trvs_(ldt_name);
 	trl_();
 	trvp_(pdev);
 	trvd_(irq);
@@ -660,10 +663,31 @@ _entry:
  * Following code requires platform_device (ldt_plat_dev.*) to work
  */
 
+#ifdef CONFIG_PM
+
+int ldt_suspend(struct platform_device *pdev, pm_message_t state)
+{
+_entry:
+	return 0;
+}
+
+int ldt_resume(struct platform_device *pdev)
+{
+_entry:
+	return 0;
+}
+
+#else
+#define ldt_suspend    NULL
+#define ldt_resume     NULL
+#endif
+
 static struct platform_driver ldt_driver = {
 	.driver.name = "ldt_device_name",
 	.driver.owner = THIS_MODULE,
 	.probe = ldt_probe,
+	.suspend = ldt_suspend,
+	.resume = ldt_resume,
 	.remove = __devexit_p(ldt_remove),
 };
 
