@@ -29,6 +29,7 @@
  *	simple UART driver on port 0x3f8 with IRQ 4
  *	Device Model (class, device)
  *	Power Management (dev_pm_ops)
+ *	Device Tree (of_device_id)
  *
  *	TODO:
  *	classic tracing
@@ -54,6 +55,8 @@
 #include <linux/serial_reg.h>
 #include <linux/debugfs.h>
 #include <linux/cdev.h>
+#include <linux/of.h>
+#include <linux/mod_devicetable.h>
 
 static char ldt_name[] = KBUILD_MODNAME;
 static int bufsize = PFN_ALIGN(16 * 1024);
@@ -678,7 +681,7 @@ static int ldt_resume(struct device *dev)
 
 static const struct dev_pm_ops ldt_pm = {
 	.suspend = ldt_suspend,
-.resume = ldt_resume,
+	.resume = ldt_resume,
 };
 
 #define ldt_pm_ops (&ldt_pm)
@@ -686,10 +689,19 @@ static const struct dev_pm_ops ldt_pm = {
 #define ldt_pm_ops NULL
 #endif
 
+static const struct of_device_id ldt_of_match[] = {
+	{.compatible = "linux-driver-template", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, ldt_of_match);
+
 static struct platform_driver ldt_driver = {
-	.driver.name = "ldt_device_name",
-	.driver.owner = THIS_MODULE,
-	.driver.pm = ldt_pm_ops,
+	.driver = {
+		.name = "ldt_device_name",
+		.owner = THIS_MODULE,
+		.pm = ldt_pm_ops,
+		.of_match_table = of_match_ptr(ldt_of_match),
+	},
 	.probe = ldt_probe,
 	.remove = __devexit_p(ldt_remove),
 };
