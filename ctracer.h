@@ -78,6 +78,7 @@ extern __thread int ret;
 
 #define trl_in() do_statement(trace_time(); trlm("{");)
 #define trl_out() do_statement(trace_time(); trlm("}");)
+#define empty_statement() do { } while (0)
 
 #define trace_mem(P, N) \
 	 IFTRACE({ int i = 0; tracef("%s=", #P); for (; i < (int)(N) ; i++) \
@@ -221,7 +222,6 @@ do {  \
 #else /* !CTRACER_ON */
 #define trllog(args ...)
 
-#define empty_statement() do { } while (0)
 static inline int empty_function(void)
 {
 	return 0;

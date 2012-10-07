@@ -28,6 +28,7 @@
  *	platform_driver and platform_device in another module
  *	simple UART driver on port 0x3f8 with IRQ 4
  *	Device Model (class, device)
+ *	Power Management (dev_pm_ops)
  *
  *	TODO:
  *	classic tracing
@@ -493,7 +494,7 @@ static int uart_probe(void)
 				outb(inb(port + UART_MCR) | UART_MCR_LOOP, port + UART_MCR);
 		}
 		if (!uart_detected && loopback) {
-			pr_warn("Emulating loopback is software\n");
+			pr_warn("Emulating loopback in software\n");
 			ret = -ENODEV;
 		}
 	}
@@ -665,29 +666,31 @@ _entry:
 
 #ifdef CONFIG_PM
 
-int ldt_suspend(struct platform_device *pdev, pm_message_t state)
+static int ldt_suspend(struct device *dev)
 {
-_entry:
 	return 0;
 }
 
-int ldt_resume(struct platform_device *pdev)
+static int ldt_resume(struct device *dev)
 {
-_entry:
 	return 0;
 }
 
+static const struct dev_pm_ops ldt_pm = {
+	.suspend = ldt_suspend,
+.resume = ldt_resume,
+};
+
+#define ldt_pm_ops (&ldt_pm)
 #else
-#define ldt_suspend    NULL
-#define ldt_resume     NULL
+#define ldt_pm_ops NULL
 #endif
 
 static struct platform_driver ldt_driver = {
 	.driver.name = "ldt_device_name",
 	.driver.owner = THIS_MODULE,
+	.driver.pm = ldt_pm_ops,
 	.probe = ldt_probe,
-	.suspend = ldt_suspend,
-	.resume = ldt_resume,
 	.remove = __devexit_p(ldt_remove),
 };
 
