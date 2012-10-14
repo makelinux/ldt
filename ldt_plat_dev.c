@@ -16,6 +16,7 @@
 
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include "tracing.h"
 
 static struct resource ldt_resource[] = {
 	{
@@ -54,8 +55,9 @@ static int ldt_plat_dev_init(void)
 	int ret = 0;
 _entry:
 	ret = platform_device_register(&ldt_platform_device);
-	trl_();
-	trvd(ret);
+	trace_loc();
+	trace_dec(ret);
+	trace_ln();
 	return ret;
 }
 

@@ -57,6 +57,7 @@
 #include <linux/cdev.h>
 #include <linux/of.h>
 #include <linux/mod_devicetable.h>
+#include "tracing.h"
 
 static char ldt_name[] = KBUILD_MODNAME;
 static int bufsize = PFN_ALIGN(16 * 1024);
@@ -80,12 +81,9 @@ module_param(loopback, int, 0);
  *	hard interrupt, soft interrupt or scheduled task
  */
 
-#define print_context()	\
-	pr_debug("%s:%d %s %s 0x%x\n", __file__, __LINE__, __func__, \
-			(in_irq() ? "harirq" : current->comm), preempt_count());
-
-#define check(a) \
-(ret = a, ((ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n", __file__, __LINE__, __func__, ret, #a) : 0), ret)
+/*
+ *	ctracer_cut_path - return filename without path
+ */
 
 static int isr_counter;
 static int ldt_work_counter;
@@ -119,7 +117,7 @@ static void ldt_send(void *data, int size)
 		if (inb(port + UART_LSR) & UART_LSR_THRE)
 			outb(*(char *)data, port + UART_TX);
 		else
-			trlm("overflow");
+			trace_msg("overflow");
 	} else
 		/* emulate loopback  */
 	if (loopback)
@@ -157,24 +155,26 @@ _entry:
 	once(print_context());
 	if (uart_detected) {
 		while (tx_ready() && kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
-			trl_();
-			trvx_(inb(port + UART_LSR));
-			trvd_(data_out);
-			trv("c", data_out);
+			trace_loc();
+			trace_hex(inb(port + UART_LSR));
+			trace_dec(data_out);
+			if (data_out >= 32)
+				printk("'%c' ", data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
 		while (rx_ready()) {
-			trl_();
-			trvx_(inb(port + UART_LSR));
+			trace_loc();
+			trace_hex(inb(port + UART_LSR));
 			data_in = inb(port + UART_RX);
-			trvd_(data_in);
-			trv("c", data_in);
+			trace_dec(data_in);
+			if (data_in >= 32)
+				printk("'%c' ", data_in);
 			ldt_received(&data_in, sizeof(data_in));
 		}
 	} else {
 		while (kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
-			trl_();
-			trvd(data_out);
+			trace_loc();
+			trace_dec_ln(data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
 	}
@@ -197,8 +197,10 @@ _entry:
 	 */
 	once(print_context());
 	isr_counter++;
-	trl_();
-	trvx(inb(port + UART_IIR));
+	trace_loc();
+	trace_hex(inb(port + UART_FCR));
+	trace_hex(inb(port + UART_IIR));
+	trace_ln();
 	tasklet_schedule(&ldt_tasklet);
 	return IRQ_HANDLED;	/* our IRQ */
 }
@@ -229,21 +231,23 @@ static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 static int ldt_open(struct inode *inode, struct file *file)
 {
 _entry:
-	trl_();
-	trvd_(imajor(inode));
-	trvd_(iminor(inode));
-	trvx(file->f_flags & O_NONBLOCK);
+	trace_loc();
+	trace_dec(imajor(inode));
+	trace_dec(iminor(inode));
+	trace_hex(file->f_flags & O_NONBLOCK);
+	trace_ln();
 	return 0;
 }
 
 static int ldt_release(struct inode *inode, struct file *file)
 {
 _entry:
-	trl_();
-	trvd_(imajor(inode));
-	trvd_(iminor(inode));
-	trvd(isr_counter);
-	trvd(ldt_work_counter);
+	trace_loc();
+	trace_dec(imajor(inode));
+	trace_dec(iminor(inode));
+	trace_dec(isr_counter);
+	trace_dec(ldt_work_counter);
+	trace_ln();
 	return 0;
 }
 
@@ -253,7 +257,7 @@ _entry:
 
 static DEFINE_MUTEX(read_lock);
 
-static ssize_t ldt_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff_t * ppos)
 {
 	int ret;
 	unsigned int copied;
@@ -263,17 +267,17 @@ _entry:
 			ret = -EAGAIN;
 			goto exit;
 		} else {
-			trlm("waiting");
+			trace_msg("waiting");
 			ret = wait_event_interruptible(ldt_readable, !kfifo_is_empty(&in_fifo));
 			if (ret == -ERESTARTSYS) {
-				trlm("interrupted");
+				trace_msg("interrupted");
 				ret = -EINTR;
 				goto exit;
 			}
 		}
 	}
 	if (mutex_lock_interruptible(&read_lock)) {
-		trlm("interrupted");
+		trace_msg("interrupted");
 		return -EINTR;
 	}
 	ret = kfifo_to_user(&in_fifo, buf, count, &copied);
@@ -288,7 +292,7 @@ exit:
 
 static DEFINE_MUTEX(write_lock);
 
-static ssize_t ldt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t ldt_write(struct file *file, const char __user * buf, size_t count, loff_t * ppos)
 {
 	int ret;
 	unsigned int copied;
@@ -306,7 +310,7 @@ _entry:
  *	polling
  */
 
-static unsigned int ldt_poll(struct file *file, poll_table *pt)
+static unsigned int ldt_poll(struct file *file, poll_table * pt)
 {
 	unsigned int mask = 0;
 _entry:
@@ -320,8 +324,9 @@ _entry:
 	mask |= POLLHUP;	/* on output eof */
 	mask |= POLLERR;	/* on output error */
 #endif
-	trl_();
-	trvx(mask);
+	trace_loc();
+	trace_hex(mask);
+	trace_ln();
 	return mask;
 }
 
@@ -355,7 +360,7 @@ _entry:
 		return -EINVAL;
 	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(buf) >> PAGE_SHIFT,
 			    vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
-		trlm("remap_pfn_range failed");
+		trace_msg("remap_pfn_range failed");
 		return -EAGAIN;
 	}
 	return 0;
@@ -365,13 +370,18 @@ _entry:
  *	ioctl
  */
 
+#define trace_ioctl(nr) printk("ioctl=(%c%c %c #%i %i)\n", \
+	(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', (_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
+	_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
+
 static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 {
 	void __user *user = (void *)arg;
 _entry:
-	trl_();
-	trvx_(cmnd);
-	trvx(arg);
+	trace_loc();
+	trace_hex(cmnd);
+	trace_hex(arg);
+	trace_ln();
 	trace_ioctl(cmnd);
 	if (_IOC_DIR(cmnd) == _IOC_WRITE) {
 		copy_from_user(in_buf, user, _IOC_SIZE(cmnd));
@@ -425,7 +435,7 @@ static struct cdev ldt_cdev;
 static struct class *ldt_class;
 static struct device *ldt_dev;
 #if 0
-static char *ldt_devnode(struct device *dev, umode_t *mode)
+static char *ldt_devnode(struct device *dev, umode_t * mode)
 {
 	if (mode)
 		*mode = S_IRUGO | S_IWUGO;
@@ -458,11 +468,10 @@ _entry:
 	while (!kthread_should_stop()) {
 		ret = wait_for_completion_interruptible(&ldt_complete);
 		if (ret == -ERESTARTSYS) {
-			trlm("interrupted");
+			trace_msg("interrupted");
 			ret = -EINTR;
 			break;
 		}
-		trllog();
 		ret = ldt_thread_sub(data);
 	}
 	return ret;
@@ -478,21 +487,23 @@ static int uart_probe(void)
 	int ret = 0;
 	if (port) {
 		port_r = request_region(port, port_size, ldt_name);
-		trvp(port_r);
+		trace_hex(port_r);
+		trace_ln();
 		/* ignore error */
 	}
 	if (irq) {
 		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, ldt_name, THIS_MODULE));
 		outb(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port + UART_MCR);
 		uart_detected = (inb(port + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
-		trvx(inb(port + UART_MSR));
+		trace_hex(inb(port + UART_MSR));
+		trace_ln();
 
 		if (uart_detected) {
 			/*outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port + UART_IER); */
 			outb(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port + UART_IER);
 			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port + UART_MCR);
 			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port + UART_FCR);
-			trvd(loopback);
+			trace_dec_ln(loopback);
 			if (loopback)
 				outb(inb(port + UART_MCR) | UART_MCR_LOOP, port + UART_MCR);
 		}
@@ -501,16 +512,16 @@ static int uart_probe(void)
 			ret = -ENODEV;
 		}
 	}
-	trvx(uart_detected);
-	trvx_(inb(port + UART_IER));
-	trvx_(inb(port + UART_IIR));
-	trvx_(inb(port + UART_FCR));
-	trln();
-	trvx_(inb(port + UART_LCR));
-	trvx_(inb(port + UART_MCR));
-	trvx_(inb(port + UART_LSR));
-	trvx_(inb(port + UART_MSR));
-	trln();
+	trace_hex(uart_detected);
+	trace_hex(inb(port + UART_IER));
+	trace_hex(inb(port + UART_IIR));
+	trace_hex(inb(port + UART_FCR));
+	trace_ln();
+	trace_hex(inb(port + UART_LCR));
+	trace_hex(inb(port + UART_MCR));
+	trace_hex(inb(port + UART_LSR));
+	trace_hex(inb(port + UART_MSR));
+	trace_ln();
 	return ret;
 }
 
@@ -527,7 +538,7 @@ _entry:
 	devid = MKDEV(major, 0);
 	ret = check(alloc_chrdev_region(&devid, 0, devs, dev_name));
 	major = MAJOR(devid);
-	trvd(major);
+	trace_dec_ln(major);
 	cdev_init(&ldt_cdev, &ldt_fops);
 	check(cdev_add(&ldt_cdev, MKDEV(major, 0), devs));
 	ldt_class = class_create(THIS_MODULE, dev_name);
@@ -535,8 +546,9 @@ _entry:
 	ldt_dev = device_create(ldt_class, NULL, devid, NULL, "%s", dev_name);
 	for (d = 1; d < devs; d++)
 		device_create(ldt_class, NULL, MKDEV(major, d), NULL, "%s%d", dev_name, d);
-	trvd(IS_ERR(ldt_dev));
-	trvp(ldt_dev);
+	trace_dec_ln(IS_ERR(ldt_dev));
+	trace_hex(ldt_dev);
+	trace_ln();
 	return major;
 }
 
@@ -551,15 +563,13 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 	struct resource *r;
 _entry:
 	print_context();
-	trl_();
-	trvs_(__DATE__);
-	trvs_(__TIME__);
-	trvs_(ldt_name);
-	trl_();
-	trvp_(pdev);
-	trvd_(irq);
-	trvd_(bufsize);
-	trln();
+	trace_loc();
+	printk("%s %s %s", ldt_name, __DATE__, __TIME__);
+	trace_loc();
+	printk("pdev = %p ", pdev);
+	trace_dec(irq);
+	trace_dec(bufsize);
+	trace_ln();
 	in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO);
 	if (!in_buf) {
 		ret = -ENOMEM;
@@ -574,6 +584,8 @@ _entry:
 	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
 	if (pdev) {
 		dev_dbg(&pdev->dev, "%s:%d %s attaching driver\n", __file__, __LINE__, __func__);
+		trace_hex(pdev->dev.of_node);
+		trace_ln();
 		data = pdev->dev.platform_data;
 		if (!irq)
 			irq = platform_get_irq(pdev, 0);
@@ -584,8 +596,7 @@ _entry:
 		if (r && !port_size)
 			port_size = resource_size(r);
 	}
-	trvp(data);
-	trvs(data);
+	printk("%p %s\n", data, data);
 	isr_counter = 0;
 	uart_probe();
 	/* proc_create(ldt_name, 0, NULL, &ldt_fops); depricated */
@@ -601,13 +612,13 @@ _entry:
 	ret = check(misc_register(&ldt_miscdev));
 	if (ret < 0)
 		goto exit;
-	trvd(ldt_miscdev.minor);
+	trace_dec_ln(ldt_miscdev.minor);
 #else
 	chrdev_region_init(ldt_name);
 #endif
 exit:
-	trl_();
-	trvd(ret);
+	trace_loc();
+	trace_dec_ln(ret);
 	return ret;
 }
 
@@ -656,8 +667,8 @@ _entry:
 		pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 0);
 		free_pages_exact(out_buf, bufsize);
 	}
-	trvd(isr_counter);
-	trvd(ldt_work_counter);
+	trace_dec_ln(isr_counter);
+	trace_dec_ln(ldt_work_counter);
 	return 0;
 }
 
@@ -690,18 +701,19 @@ static const struct dev_pm_ops ldt_pm = {
 #endif
 
 static const struct of_device_id ldt_of_match[] = {
-	{.compatible = "linux-driver-template", },
+	{.compatible = "linux-driver-template",},
 	{},
 };
+
 MODULE_DEVICE_TABLE(of, ldt_of_match);
 
 static struct platform_driver ldt_driver = {
 	.driver = {
-		.name = "ldt_device_name",
-		.owner = THIS_MODULE,
-		.pm = ldt_pm_ops,
-		.of_match_table = of_match_ptr(ldt_of_match),
-	},
+		   .name = "ldt_device_name",
+		   .owner = THIS_MODULE,
+		   .pm = ldt_pm_ops,
+		   .of_match_table = of_match_ptr(ldt_of_match),
+		   },
 	.probe = ldt_probe,
 	.remove = __devexit_p(ldt_remove),
 };

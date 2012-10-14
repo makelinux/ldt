@@ -13,10 +13,11 @@
 (ret = a, ((ret < 0) ? printk("%s:%i %s FAIL\n\t%i=%s\n", __file__, __LINE__, __func__, ret, #a) : 0), ret)
 
 #define trace_loc()	printk(KERN_DEBUG"%s:%d %s ", __file__, __LINE__, __func__)
-#define trace_hex(h)	printk("%s = %ld ",#h,(long int)h)
+#define trace_hex(h)	printk("%s = 0x%lX ",#h,(long int)h)
 #define trace_dec(d)	printk("%s = %ld ",#d,(long int)d)
 #define trace_dec_ln(d)	printk("%s = %ld\n",#d,(long int)d)
 #define trace_msg(m)	printk(KERN_DEBUG"%s:%d %s %s\n", __file__, __LINE__, __func__,m)
+#define trace_ln(m)	printk("\n")
 #define once(exp) do{ \
 	static int _passed; if (!_passed) {exp; }; _passed = 1;} while (0)
 
