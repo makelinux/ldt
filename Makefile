@@ -8,6 +8,7 @@ obj-m+= ldt.o
 obj-m+= ldt_plat_drv.o # implements platform_driver only
 obj-m+= ldt_plat_dev.o # implements platform_device and resource
 #obj-m+= chrdev_region_sample.o
+obj-m+= ldt_configfs_basic.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
@@ -24,7 +25,7 @@ clean:
 
 dio: CPPFLAGS+= -D CTRACER_ON -include ctracer.h -g
 
-_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h
+_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c
 
 checkpatch:
 	/usr/src/linux-headers-$(shell uname -r)/scripts/checkpatch.pl --no-tree --show-types --ignore LONG_LINE,LINE_CONTINUATIONS --terse -f $(_src) Makefile
