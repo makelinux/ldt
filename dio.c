@@ -38,8 +38,9 @@ static enum io_type {
 
 static void *inbuf, *outbuf;
 static void *mm;
-static int buf_size = 8 * 1024;
-static int mmapoffset;
+static void *mem;
+static int buf_size;
+static int offset;
 static char *dev_name;
 static int ignore_eof;
 static int ioctl_num;
@@ -47,6 +48,7 @@ static int loops;
 static int delay;
 static char ioctl_type = 'A';
 __thread int ret;
+static int ro, wo; /* read only, write only*/
 
 /*
 #define VERBOSE
@@ -59,11 +61,11 @@ int output(int dev, void *buf, int size)
 	trvd(size);
 #endif
 	ret = 0;
-	if (dev < 0)
+	if (dev < 0 || ro)
 		return 0;
 	switch (io_type) {
 	case mmap_io:
-		memcpy(mm, buf, size);
+		memcpy(mem, buf, size);
 		ret = size;
 		break;
 	case ioctl_io:
@@ -83,12 +85,11 @@ int input(int dev, void *buf, int size)
 	trl_();
 	trvd(size);
 #endif
-	if (dev < 0)
+	if (dev < 0 || wo)
 		return 0;
 	switch (io_type) {
 	case mmap_io:
-		memcpy(buf, mm, size);
-		memset(mm, 0, size);
+		memcpy(buf, mem, size);
 		ret = size;
 		break;
 	case ioctl_io:
@@ -107,6 +108,8 @@ int io_start(int dev)
 	struct pollfd pfd[2];
 	ssize_t data_in_len, data_out_len, len_total = 0;
 	int i = 0;
+
+	// TODO: wo, ro
 	pfd[0].fd = fileno(stdin);
 	pfd[0].events = POLLIN;
 	pfd[1].fd = dev;
@@ -214,11 +217,14 @@ int options_init()
 	add_literal_option(ioctl_type);
 	add_literal_option(loops);
 	add_literal_option(delay);
+	add_literal_option(offset);
 	add_flag_option("ioctl", &io_type, ioctl_io);
 	add_flag_option("mmap", &io_type, mmap_io);
 	add_flag_option("file", &io_type, file_io);
 	add_flag_option("ignore_eof", &ignore_eof, 1);
 	add_flag_option("verbose", &verbose, 1);
+	add_flag_option("ro", &ro, 1);
+	add_flag_option("wo", &wo, 1);
 	options[optnum].name = strdup("help");
 	options[optnum].has_arg = 0;
 	options[optnum].val = 'h';
@@ -282,6 +288,7 @@ int init(int argc, char *argv[])
 			break;
 		default:	/* '?' */
 			printf("Error in arguments\n");
+			trvx(opt);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -295,19 +302,22 @@ int init(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	int dev;
+
+	buf_size = sysconf(_SC_PAGESIZE);
+	init(argc, argv);
 	verbose && fprintf(stderr, "%s compiled " __DATE__ " " __TIME__ "\n", argv[0]);
 	if (io_type == ioctl_io && buf_size >= 1 << _IOC_SIZEBITS)
 		buf_size = (1 << _IOC_SIZEBITS) - 1;
-	init(argc, argv);
 	inbuf = malloc(buf_size);
 	outbuf = malloc(buf_size);
 	chkne(dev = open(dev_name, O_CREAT | O_RDWR, 0666));
 	if (io_type == mmap_io) {
-		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, dev, mmapoffset);
+		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, dev, offset & ~ (sysconf(_SC_PAGESIZE)-1));
 		if (mm == MAP_FAILED) {
 			warn("mmap() failed");
 			goto exit;
 		}
+		mem = mm + ( offset & (sysconf(_SC_PAGESIZE)-1));
 	}
 	if (verbose) {
 		trvs_(dev_name);
@@ -315,21 +325,25 @@ int main(int argc, char *argv[])
 		trvd_(buf_size);
 		trvd_(ignore_eof);
 		trvd_(verbose);
-		trvp(mm);
-		trvd((int)mm);
+		trvp_(mm);
+		trvp_(mem);
 		trln();
 	}
 	switch (io_type) {
 	case mmap_io:
 	case ioctl_io:
-		chkne(ret = read(fileno(stdin), inbuf, buf_size));
-		if (ret < 0)
-			goto exit;
-		chkne(ret = output(dev, inbuf, ret));
-		chkne(ret = input(dev, outbuf, buf_size));
-		if (ret < 0)
-			goto exit;
-		write(fileno(stdout), outbuf, ret);
+		if ( ! ro ) {
+			chkne(ret = read(fileno(stdin), inbuf, buf_size));
+			if (ret < 0)
+				goto exit;
+			chkne(ret = output(dev, inbuf, ret));
+		}
+		if ( ! wo ) {
+			chkne(ret = input(dev, outbuf, buf_size));
+			if (ret < 0)
+				goto exit;
+			write(fileno(stdout), outbuf, ret);
+		}
 		break;
 	case file_io:
 	default:
