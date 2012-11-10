@@ -64,6 +64,7 @@ static int bufsize = PFN_ALIGN(16 * 1024);
 static void *in_buf;
 static void *out_buf;
 static int uart_detected;
+void *port_ptr;
 
 static int port;
 module_param(port, int, 0);
@@ -114,8 +115,8 @@ static void ldt_received(void *data, int size)
 static void ldt_send(void *data, int size)
 {
 	if (uart_detected) {
-		if (inb(port + UART_LSR) & UART_LSR_THRE)
-			outb(*(char *)data, port + UART_TX);
+		if (ioread8(port_ptr + UART_LSR) & UART_LSR_THRE)
+			iowrite8(*(char *)data, port_ptr + UART_TX);
 		else
 			trace_msg("overflow");
 	} else
@@ -145,8 +146,8 @@ DECLARE_WORK(ldt_work, ldt_work_func);
 
 static DECLARE_COMPLETION(ldt_complete);
 
-#define tx_ready()	(inb(port + UART_LSR) & UART_LSR_THRE)
-#define rx_ready()	(inb(port + UART_LSR) & UART_LSR_DR)
+#define tx_ready()	(ioread8(port_ptr + UART_LSR) & UART_LSR_THRE)
+#define rx_ready()	(ioread8(port_ptr + UART_LSR) & UART_LSR_DR)
 
 static void ldt_tasklet_func(unsigned long d)
 {
@@ -156,19 +157,19 @@ _entry:
 	if (uart_detected) {
 		while (tx_ready() && kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
 			trace_loc();
-			trace_hex(inb(port + UART_LSR));
+			trace_hex(ioread8(port_ptr + UART_LSR));
 			trace_dec(data_out);
 			if (data_out >= 32)
-				printk("'%c' ", data_out);
+				printk(KERN_CONT"'%c' ", data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
 		while (rx_ready()) {
 			trace_loc();
-			trace_hex(inb(port + UART_LSR));
-			data_in = inb(port + UART_RX);
+			trace_hex(ioread8(port_ptr + UART_LSR));
+			data_in = ioread8(port_ptr + UART_RX);
 			trace_dec(data_in);
 			if (data_in >= 32)
-				printk("'%c' ", data_in);
+				printk(KERN_CONT"'%c' ", data_in);
 			ldt_received(&data_in, sizeof(data_in));
 		}
 	} else {
@@ -198,8 +199,8 @@ _entry:
 	once(print_context());
 	isr_counter++;
 	trace_loc();
-	trace_hex(inb(port + UART_FCR));
-	trace_hex(inb(port + UART_IIR));
+	trace_hex(ioread8(port_ptr + UART_FCR));
+	trace_hex(ioread8(port_ptr + UART_IIR));
 	trace_ln();
 	tasklet_schedule(&ldt_tasklet);
 	return IRQ_HANDLED;	/* our IRQ */
@@ -231,7 +232,7 @@ static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 static int ldt_open(struct inode *inode, struct file *file)
 {
 _entry:
-	trace_loc();
+	print_context();
 	trace_dec(imajor(inode));
 	trace_dec(iminor(inode));
 	trace_hex(file->f_flags & O_NONBLOCK);
@@ -242,7 +243,7 @@ _entry:
 static int ldt_release(struct inode *inode, struct file *file)
 {
 _entry:
-	trace_loc();
+	print_context();
 	trace_dec(imajor(inode));
 	trace_dec(iminor(inode));
 	trace_dec(isr_counter);
@@ -482,10 +483,13 @@ _entry:
  */
 
 static struct resource *port_r;
+
 static int uart_probe(void)
 {
 	int ret = 0;
 	if (port) {
+		port_ptr = ioport_map(port, 0x100);
+		trace_hex(port_ptr);
 		port_r = request_region(port, port_size, ldt_name);
 		trace_hex(port_r);
 		trace_ln();
@@ -493,19 +497,19 @@ static int uart_probe(void)
 	}
 	if (irq) {
 		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, ldt_name, THIS_MODULE));
-		outb(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port + UART_MCR);
-		uart_detected = (inb(port + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
-		trace_hex(inb(port + UART_MSR));
+		iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port_ptr + UART_MCR);
+		uart_detected = (ioread8(port_ptr + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
+		trace_hex(ioread8(port_ptr + UART_MSR));
 		trace_ln();
 
 		if (uart_detected) {
-			/*outb(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port + UART_IER); */
-			outb(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port + UART_IER);
-			outb(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port + UART_MCR);
-			outb(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port + UART_FCR);
+			/*iowrite8(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port_ptr + UART_IER); */
+			iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port_ptr + UART_IER);
+			iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port_ptr + UART_MCR);
+			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port_ptr + UART_FCR);
 			trace_dec_ln(loopback);
 			if (loopback)
-				outb(inb(port + UART_MCR) | UART_MCR_LOOP, port + UART_MCR);
+				iowrite8(ioread8(port_ptr + UART_MCR) | UART_MCR_LOOP, port_ptr + UART_MCR);
 		}
 		if (!uart_detected && loopback) {
 			pr_warn("Emulating loopback in software\n");
@@ -513,14 +517,14 @@ static int uart_probe(void)
 		}
 	}
 	trace_hex(uart_detected);
-	trace_hex(inb(port + UART_IER));
-	trace_hex(inb(port + UART_IIR));
-	trace_hex(inb(port + UART_FCR));
+	trace_hex(ioread8(port_ptr + UART_IER));
+	trace_hex(ioread8(port_ptr + UART_IIR));
+	trace_hex(ioread8(port_ptr + UART_FCR));
 	trace_ln();
-	trace_hex(inb(port + UART_LCR));
-	trace_hex(inb(port + UART_MCR));
-	trace_hex(inb(port + UART_LSR));
-	trace_hex(inb(port + UART_MSR));
+	trace_hex(ioread8(port_ptr + UART_LCR));
+	trace_hex(ioread8(port_ptr + UART_MCR));
+	trace_hex(ioread8(port_ptr + UART_LSR));
+	trace_hex(ioread8(port_ptr + UART_MSR));
 	trace_ln();
 	return ret;
 }
@@ -564,9 +568,9 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 _entry:
 	print_context();
 	trace_loc();
-	printk("%s %s %s", ldt_name, __DATE__, __TIME__);
+	printk(KERN_DEBUG"%s %s %s", ldt_name, __DATE__, __TIME__);
 	trace_loc();
-	printk("pdev = %p ", pdev);
+	printk(KERN_DEBUG"pdev = %p ", pdev);
 	trace_dec(irq);
 	trace_dec(bufsize);
 	trace_ln();
@@ -652,10 +656,10 @@ _entry:
 	if (port_r)
 		release_region(port, port_size);
 	if (irq) {
-		outb(0, port + UART_IER);
-		outb(0, port + UART_FCR);
-		outb(0, port + UART_MCR);
-		inb(port + UART_RX);
+		iowrite8(0, port_ptr + UART_IER);
+		iowrite8(0, port_ptr + UART_FCR);
+		iowrite8(0, port_ptr + UART_MCR);
+		ioread8(port_ptr + UART_RX);
 		free_irq(irq, THIS_MODULE);
 	}
 	tasklet_kill(&ldt_tasklet);
@@ -669,6 +673,8 @@ _entry:
 	}
 	trace_dec_ln(isr_counter);
 	trace_dec_ln(ldt_work_counter);
+	if (port_ptr)
+		ioport_unmap(port_ptr);
 	return 0;
 }
 
