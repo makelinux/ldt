@@ -57,6 +57,7 @@ static int ro, wo; /* read only, write only*/
 int output(int dev, void *buf, int size)
 {
 #ifdef VERBOSE
+_entry:
 	trl_();
 	trvd(size);
 #endif
@@ -82,6 +83,7 @@ int input(int dev, void *buf, int size)
 {
 	ret = 0;
 #ifdef VERBOSE
+_entry:
 	trl_();
 	trvd(size);
 #endif
@@ -109,7 +111,7 @@ int io_start(int dev)
 	ssize_t data_in_len, data_out_len, len_total = 0;
 	int i = 0;
 
-	// TODO: wo, ro
+	/* TODO: wo, ro */
 	pfd[0].fd = fileno(stdin);
 	pfd[0].events = POLLIN;
 	pfd[1].fd = dev;
@@ -312,12 +314,12 @@ int main(int argc, char *argv[])
 	outbuf = malloc(buf_size);
 	chkne(dev = open(dev_name, O_CREAT | O_RDWR, 0666));
 	if (io_type == mmap_io) {
-		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, dev, offset & ~ (sysconf(_SC_PAGESIZE)-1));
+		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE)-1));
 		if (mm == MAP_FAILED) {
 			warn("mmap() failed");
 			goto exit;
 		}
-		mem = mm + ( offset & (sysconf(_SC_PAGESIZE)-1));
+		mem = mm + (offset & (sysconf(_SC_PAGESIZE)-1));
 	}
 	if (verbose) {
 		trvs_(dev_name);
@@ -332,13 +334,13 @@ int main(int argc, char *argv[])
 	switch (io_type) {
 	case mmap_io:
 	case ioctl_io:
-		if ( ! ro ) {
+		if (!ro) {
 			chkne(ret = read(fileno(stdin), inbuf, buf_size));
 			if (ret < 0)
 				goto exit;
 			chkne(ret = output(dev, inbuf, ret));
 		}
-		if ( ! wo ) {
+		if (!wo) {
 			chkne(ret = input(dev, outbuf, buf_size));
 			if (ret < 0)
 				goto exit;
