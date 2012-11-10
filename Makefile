@@ -24,6 +24,7 @@ clean:
 	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions modules.order Module.symvers dio *.tmp *.log
 
 dio: CPPFLAGS+= -D CTRACER_ON -include ctracer.h -g
+#dio: CPPFLAGS+= -D VERBOSE
 
 _src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c
 

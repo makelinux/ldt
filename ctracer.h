@@ -25,10 +25,12 @@
 #define CTRACER_H_INCLUDED
 extern __thread int ret;
 
-#define multistatement(ms)	ms	/*trick to bypass checkpatch.pl error */
-#define _entry multistatement(trllog(); goto _entry; _entry)
+#define multistatement(ms)	ms	/* trick to bypass checkpatch.pl error */
 /*
-#define _entry _trace_enter_exit_(); trln(); goto _entry_second; _entry_second
+#define _entry multistatement(trllog(); goto _entry; _entry)
+*/
+#define _entry multistatement(_trace_enter_exit_(); trln(); goto _entry_second; _entry_second)
+/*
 #define _entry once(trl()); goto _entry; _entry
 #define return trlm("} "); return
 */
@@ -46,8 +48,8 @@ extern __thread int ret;
 #define trla(fmt, args...) tracef("%s:%i %s "fmt, __file__, __LINE__, __func__, ## args)
 #define trv(t, v) tracef(#v" = %"t EOL, v)
 #define trv_(t, v) tracef(#v" = %"t" ", v)
-#define trvd(d) trv("d", (int)d)
-#define trvd_(d) trv_("d", d)
+#define trvd(d) tracef(#d" = %ld"EOL, (long int)d)
+#define trvd_(d) tracef(#d" = %ld ", (long int)d)
 #define trvx_(x) tracef(#x" = 0x%x ", (int)x)
 #define trvx(x) tracef(#x" = 0x%x"EOL, (int)x)
 #define trvlx(x) tracef(#x" = %#llx"EOL, (int)x)
@@ -67,7 +69,7 @@ extern __thread int ret;
 
 /* trvdnz - TRace Digital Variable, if Not Zero */
 #define trvdnz(d) { if (d) tracef(#d" = %d"EOL, (int)d); }
-#define trace(a) do { trla("calling %s {\n", #a); a; tracef("} done\n"); } while (0)
+#define trace_call(a) do { trla("calling %s {\n", #a); a; tracef("} done\n"); } while (0)
 
 /* trlm - TRace Location, with Message */
 #define trlm(m) tracef(SOL"%s:%i %s %s"EOL, __file__, __LINE__, __func__, m)
@@ -144,6 +146,8 @@ if (!((i+1) % 64)) \
 
 #ifdef __KERNEL__
 #undef TRACE_TIME
+#include <linux/kernel.h>
+#include <linux/printk.h>
 
 #ifdef TRACE_LINUX_MEMORY_ON
 #include <linux/mmzone.h>
@@ -241,6 +245,7 @@ static inline int empty_function(void)
 
 #ifdef MODULE
 /* omit full absolute path for modules */
+extern char *strrchr(const char *s, int c);
 #define ctracer_cut_path(fn) (fn[0] != '/' ? fn : (strrchr(fn, '/') + 1))
 #define __file__	ctracer_cut_path(__FILE__)
 #else
@@ -336,7 +341,6 @@ static inline void stack_trace(void)
 #endif
 #endif /* __GLIBC__ */
 
-#include <linux/kernel.h>
 /* see also nr_free_pages */
 #define freeram() { \
 	static unsigned int last; struct sysinfo i; si_meminfo(&i); trl_(); \
@@ -344,18 +348,32 @@ static inline void stack_trace(void)
 	trvi_(i.freeram); trvi_(used);  trvi(d); \
 	last = i.freeram; }
 
-static inline void _func_exit(void *l)
+extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
+
+static inline void __on_cleanup(char *s[])
 {
-	char **loc = (char **)l;
-	if (loc)
-		tracef("%s }\n", *loc);
+#ifdef __KERNEL__
+	printk(KERN_DEBUG"%s", *s);
+#else
+	fputs(*s, stderr);
+#endif
 }
 
-#define _trace_enter_exit_() char const *_location __attribute__ ((cleanup(_func_exit))) = __func__; \
-	tracef("%s { ", _location);
+#if !defined(__KERNEL__) || defined(MODULE)
+static inline int lookup_symbol_name(unsigned long addr, char *symbol)
+{
+	return sprintf(symbol, "%lx", addr);
+}
+#else
+int lookup_symbol_name(unsigned long addr, char *symname);
+#endif
 
-
+#define _trace_enter_exit_() char _caller[200]; lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller);	\
+	char __attribute__((cleanup(__on_cleanup))) *_s; char _ret_msg[100]; _s = _ret_msg; \
+	snprintf(_ret_msg, sizeof(_ret_msg), "%s < %s }\n", _caller, __func__); \
+	tracef("%s > %s { @ %s:%d", _caller, __func__, __file__, __LINE__);
 
 /*__END_DECLS */
 #endif /* CTRACER_H_INCLUDED */
 #endif /* __ASSEMBLY__ */
+
