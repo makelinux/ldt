@@ -56,6 +56,7 @@
 #include <linux/debugfs.h>
 #include <linux/cdev.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/mod_devicetable.h>
 #include "tracing.h"
 
@@ -488,7 +489,7 @@ static int uart_probe(void)
 {
 	int ret = 0;
 	if (port) {
-		port_ptr = ioport_map(port, 0x100);
+		port_ptr = ioport_map(port, port_size);
 		trace_hex(port_ptr);
 		port_r = request_region(port, port_size, ldt_name);
 		trace_hex(port_r);
@@ -590,7 +591,11 @@ _entry:
 		dev_dbg(&pdev->dev, "%s:%d %s attaching driver\n", __file__, __LINE__, __func__);
 		trace_hex(pdev->dev.of_node);
 		trace_ln();
+#ifdef CONFIG_OF_DEVICE
+		check(of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev));
+#endif
 		data = pdev->dev.platform_data;
+		printk("%p %s\n", data, data);
 		if (!irq)
 			irq = platform_get_irq(pdev, 0);
 		r = platform_get_resource(pdev, IORESOURCE_IO, 0);
@@ -600,7 +605,6 @@ _entry:
 		if (r && !port_size)
 			port_size = resource_size(r);
 	}
-	printk("%p %s\n", data, data);
 	isr_counter = 0;
 	uart_probe();
 	/* proc_create(ldt_name, 0, NULL, &ldt_fops); depricated */
