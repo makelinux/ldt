@@ -52,18 +52,11 @@ static struct platform_device ldt_platform_device = {
 
 static int ldt_plat_dev_init(void)
 {
-	int ret = 0;
-_entry:
-	ret = platform_device_register(&ldt_platform_device);
-	trace_loc();
-	trace_dec(ret);
-	trace_ln();
-	return ret;
+	return platform_device_register(&ldt_platform_device);
 }
 
 static void ldt_plat_dev_exit(void)
 {
-_entry:
 	platform_device_unregister(&ldt_platform_device);
 }
 

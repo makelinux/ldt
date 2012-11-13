@@ -20,10 +20,6 @@ static __devinit int ldt_plat_probe(struct platform_device *pdev)
 _entry:
 	if (pdev)
 		data = pdev->dev.platform_data;
-	trace_loc();
-	trace_hex(pdev);
-	trace_hex(data);
-	trace_ln();
 	r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	return 0;
 }

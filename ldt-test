@@ -18,9 +18,6 @@ GRAY="\\033[0;37m"
 set -o errtrace
 debugfs=`grep debugfs /proc/mounts | awk '{ print $2; }'`
 tracing=$debugfs/tracing
-irq=0	# define irq to bind diriver to HW IRQ, WARING: can hung the system
-irq=4	# serial port
-# irq=`grep ehci_hcd /proc/interrupts | cut -f1 -d:`
 
 tracing()
 {
@@ -33,7 +30,7 @@ tracing_start()
 	tracing "echo function > current_tracer" # need for draw_functrace.py
 	#tracing "echo function_graph > current_tracer"
 	tracing "echo 1 > function_profile_enabled"
-	# useful stuff:
+	# useful optional command:
 	#tracing "echo XXX > set_ftrace_notrace"
 	#sudo cat $tracing/current_tracer
 	#sudo cat $tracing/set_ftrace_filter
@@ -43,7 +40,6 @@ tracing_start()
 }
 
 tracing_stop()
-
 {
 	( echo Profiling data per CPU
 	tracing "cat trace_stat/function*" )> trace_stat.log && echo trace_stat.log saved

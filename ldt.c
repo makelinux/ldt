@@ -32,7 +32,6 @@
  *	Device Tree (of_device_id)
  *
  *	TODO:
- *	classic tracing
  *	linked list
  *	private instance state struct
  *
@@ -58,7 +57,33 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/mod_devicetable.h>
-#include "tracing.h"
+
+#define ctracer_cut_path(fn) (fn[0] != '/' ? fn : (strrchr(fn, '/') + 1))
+#define __file__	ctracer_cut_path(__FILE__)
+
+/*
+ *	print_context prints execution context:
+ *	hard interrupt, soft interrupt or scheduled task
+ */
+
+#define print_context()	\
+	pr_debug("%s:%d %s %s 0x%x\n", __file__, __LINE__, __func__, \
+			(in_irq() ? "harirq" : current->comm), preempt_count());
+
+#define once(exp) do { \
+	static int _passed; if (!_passed) { exp; }; _passed = 1; } while (0)
+
+#define check(a) \
+	(ret = a, ((ret < 0) ? pr_warning("%s:%i %s FAIL\n\t%i=%s\n", \
+	__file__, __LINE__, __func__, ret, #a) : 0), ret)
+
+#define pr_debug_hex(h)	pr_debug("%s:%d %s %s = 0x%lX\n", \
+	__file__, __LINE__, __func__, #h, (long int)h)
+#define pr_debug_dec(d)	pr_debug("%s:%d %s %s = %ld\n", \
+	__file__, __LINE__, __func__, #d, (long int)d)
+
+#define pr_err_msg(m)	pr_err("%s:%d %s %s\n", __file__, __LINE__, __func__, m)
+
 
 static char ldt_name[] = KBUILD_MODNAME;
 static int bufsize = PFN_ALIGN(16 * 1024);
@@ -78,15 +103,6 @@ module_param(irq, int, 0);
 static int loopback;
 module_param(loopback, int, 0);
 
-/*
- *	print_context prints execution context:
- *	hard interrupt, soft interrupt or scheduled task
- */
-
-/*
- *	ctracer_cut_path - return filename without path
- */
-
 static int isr_counter;
 static int ldt_work_counter;
 
@@ -97,6 +113,7 @@ static DEFINE_KFIFO(out_fifo, char, FIFO_SIZE);
 static DECLARE_WAIT_QUEUE_HEAD(ldt_readable);
 
 static spinlock_t fifo_lock;
+
 
 /*
  *	ldt_received - called with data received from HW port
@@ -119,7 +136,7 @@ static void ldt_send(void *data, int size)
 		if (ioread8(port_ptr + UART_LSR) & UART_LSR_THRE)
 			iowrite8(*(char *)data, port_ptr + UART_TX);
 		else
-			trace_msg("overflow");
+			pr_err_msg("overflow");
 	} else
 		/* emulate loopback  */
 	if (loopback)
@@ -130,11 +147,8 @@ static void ldt_send(void *data, int size)
  *	work
  */
 
-/* Fictive label _entry is used for tracing */
-
 static void ldt_work_func(struct work_struct *work)
 {
-_entry:;
 	once(print_context());
 	ldt_work_counter++;
 }
@@ -153,30 +167,26 @@ static DECLARE_COMPLETION(ldt_complete);
 static void ldt_tasklet_func(unsigned long d)
 {
 	char data_out, data_in;
-_entry:
 	once(print_context());
 	if (uart_detected) {
 		while (tx_ready() && kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
-			trace_loc();
-			trace_hex(ioread8(port_ptr + UART_LSR));
-			trace_dec(data_out);
+			pr_debug_hex(ioread8(port_ptr + UART_LSR));
+			pr_debug_dec(data_out);
 			if (data_out >= 32)
-				printk(KERN_CONT"'%c' ", data_out);
+				pr_debug("data_out = '%c' ", data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
 		while (rx_ready()) {
-			trace_loc();
-			trace_hex(ioread8(port_ptr + UART_LSR));
+			pr_debug_hex(ioread8(port_ptr + UART_LSR));
 			data_in = ioread8(port_ptr + UART_RX);
-			trace_dec(data_in);
+			pr_debug_dec(data_in);
 			if (data_in >= 32)
-				printk(KERN_CONT"'%c' ", data_in);
+				pr_debug("data_out = '%c' ", data_in);
 			ldt_received(&data_in, sizeof(data_in));
 		}
 	} else {
 		while (kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
-			trace_loc();
-			trace_dec_ln(data_out);
+			pr_debug_dec(data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
 	}
@@ -192,17 +202,14 @@ static DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
 
 static irqreturn_t ldt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
-_entry:
 	/*
 	 *      UART interrupt is not fired in loopback mode,
 	 *      therefore fire ldt_tasklet from timer too
 	 */
 	once(print_context());
 	isr_counter++;
-	trace_loc();
-	trace_hex(ioread8(port_ptr + UART_FCR));
-	trace_hex(ioread8(port_ptr + UART_IIR));
-	trace_ln();
+	pr_debug_hex(ioread8(port_ptr + UART_FCR));
+	pr_debug_hex(ioread8(port_ptr + UART_IIR));
 	tasklet_schedule(&ldt_tasklet);
 	return IRQ_HANDLED;	/* our IRQ */
 }
@@ -214,7 +221,6 @@ _entry:
 static struct timer_list ldt_timer;
 static void ldt_timer_func(unsigned long data)
 {
-_entry:
 	/*
 	 *      this timer is used just to fire ldt_tasklet,
 	 *      when there is no interrupt in loopback mode
@@ -232,24 +238,20 @@ static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 
 static int ldt_open(struct inode *inode, struct file *file)
 {
-_entry:
 	print_context();
-	trace_dec(imajor(inode));
-	trace_dec(iminor(inode));
-	trace_hex(file->f_flags & O_NONBLOCK);
-	trace_ln();
+	pr_debug_dec(imajor(inode));
+	pr_debug_dec(iminor(inode));
+	pr_debug_hex(file->f_flags & O_NONBLOCK);
 	return 0;
 }
 
 static int ldt_release(struct inode *inode, struct file *file)
 {
-_entry:
 	print_context();
-	trace_dec(imajor(inode));
-	trace_dec(iminor(inode));
-	trace_dec(isr_counter);
-	trace_dec(ldt_work_counter);
-	trace_ln();
+	pr_debug_dec(imajor(inode));
+	pr_debug_dec(iminor(inode));
+	pr_debug_dec(isr_counter);
+	pr_debug_dec(ldt_work_counter);
 	return 0;
 }
 
@@ -263,23 +265,22 @@ static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff
 {
 	int ret;
 	unsigned int copied;
-_entry:
 	if (kfifo_is_empty(&in_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			ret = -EAGAIN;
 			goto exit;
 		} else {
-			trace_msg("waiting");
+			pr_err_msg("waiting");
 			ret = wait_event_interruptible(ldt_readable, !kfifo_is_empty(&in_fifo));
 			if (ret == -ERESTARTSYS) {
-				trace_msg("interrupted");
+				pr_err_msg("interrupted");
 				ret = -EINTR;
 				goto exit;
 			}
 		}
 	}
 	if (mutex_lock_interruptible(&read_lock)) {
-		trace_msg("interrupted");
+		pr_err_msg("interrupted");
 		return -EINTR;
 	}
 	ret = kfifo_to_user(&in_fifo, buf, count, &copied);
@@ -298,7 +299,6 @@ static ssize_t ldt_write(struct file *file, const char __user * buf, size_t coun
 {
 	int ret;
 	unsigned int copied;
-_entry:
 	/* TODO: wait_event_interruptible ... ldt_writeable */
 	if (mutex_lock_interruptible(&write_lock))
 		return -EINTR;
@@ -315,7 +315,6 @@ _entry:
 static unsigned int ldt_poll(struct file *file, poll_table * pt)
 {
 	unsigned int mask = 0;
-_entry:
 	poll_wait(file, &ldt_readable, pt);
 	/*poll_wait(file, ldt_writeable, pt); TODO */
 
@@ -326,9 +325,7 @@ _entry:
 	mask |= POLLHUP;	/* on output eof */
 	mask |= POLLERR;	/* on output error */
 #endif
-	trace_loc();
-	trace_hex(mask);
-	trace_ln();
+	pr_debug_hex(mask);
 	return mask;
 }
 
@@ -353,7 +350,6 @@ void pages_flag(struct page *page, int pages, int mask, int value)
 static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	void *buf = NULL;
-_entry:
 	if (vma->vm_flags & VM_WRITE)
 		buf = in_buf;
 	else if (vma->vm_flags & VM_READ)
@@ -362,7 +358,7 @@ _entry:
 		return -EINVAL;
 	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(buf) >> PAGE_SHIFT,
 			    vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
-		trace_msg("remap_pfn_range failed");
+		pr_err_msg("remap_pfn_range failed");
 		return -EAGAIN;
 	}
 	return 0;
@@ -379,11 +375,8 @@ _entry:
 static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 {
 	void __user *user = (void *)arg;
-_entry:
-	trace_loc();
-	trace_hex(cmnd);
-	trace_hex(arg);
-	trace_ln();
+	pr_debug_hex(cmnd);
+	pr_debug_hex(arg);
 	trace_ioctl(cmnd);
 	if (_IOC_DIR(cmnd) == _IOC_WRITE) {
 		copy_from_user(in_buf, user, _IOC_SIZE(cmnd));
@@ -454,7 +447,6 @@ static char *ldt_devnode(struct device *dev, umode_t * mode)
 static int ldt_thread_sub(void *data)
 {
 	int ret = 0;
-_entry:
 	/*
 	   perform here a useful work in task context
 	 */
@@ -464,13 +456,12 @@ _entry:
 static int ldt_thread(void *data)
 {
 	int ret = 0;
-_entry:
 	print_context();
 	allow_signal(SIGINT);
 	while (!kthread_should_stop()) {
 		ret = wait_for_completion_interruptible(&ldt_complete);
 		if (ret == -ERESTARTSYS) {
-			trace_msg("interrupted");
+			pr_err_msg("interrupted");
 			ret = -EINTR;
 			break;
 		}
@@ -490,25 +481,23 @@ static int uart_probe(void)
 	int ret = 0;
 	if (port) {
 		port_ptr = ioport_map(port, port_size);
-		trace_hex(port_ptr);
+		pr_debug_hex(port_ptr);
 		port_r = request_region(port, port_size, ldt_name);
-		trace_hex(port_r);
-		trace_ln();
+		pr_debug_hex(port_r);
 		/* ignore error */
 	}
 	if (irq) {
 		ret = check(request_irq(irq, (void *)ldt_isr, IRQF_SHARED, ldt_name, THIS_MODULE));
 		iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port_ptr + UART_MCR);
 		uart_detected = (ioread8(port_ptr + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
-		trace_hex(ioread8(port_ptr + UART_MSR));
-		trace_ln();
+		pr_debug_hex(ioread8(port_ptr + UART_MSR));
 
 		if (uart_detected) {
 			/*iowrite8(UART_IER_MSI | UART_IER_THRI |  UART_IER_RDI | UART_IER_RLSI, port_ptr + UART_IER); */
 			iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port_ptr + UART_IER);
 			iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port_ptr + UART_MCR);
 			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port_ptr + UART_FCR);
-			trace_dec_ln(loopback);
+			pr_debug_dec(loopback);
 			if (loopback)
 				iowrite8(ioread8(port_ptr + UART_MCR) | UART_MCR_LOOP, port_ptr + UART_MCR);
 		}
@@ -517,16 +506,14 @@ static int uart_probe(void)
 			ret = -ENODEV;
 		}
 	}
-	trace_hex(uart_detected);
-	trace_hex(ioread8(port_ptr + UART_IER));
-	trace_hex(ioread8(port_ptr + UART_IIR));
-	trace_hex(ioread8(port_ptr + UART_FCR));
-	trace_ln();
-	trace_hex(ioread8(port_ptr + UART_LCR));
-	trace_hex(ioread8(port_ptr + UART_MCR));
-	trace_hex(ioread8(port_ptr + UART_LSR));
-	trace_hex(ioread8(port_ptr + UART_MSR));
-	trace_ln();
+	pr_debug_hex(uart_detected);
+	pr_debug_hex(ioread8(port_ptr + UART_IER));
+	pr_debug_hex(ioread8(port_ptr + UART_IIR));
+	pr_debug_hex(ioread8(port_ptr + UART_FCR));
+	pr_debug_hex(ioread8(port_ptr + UART_LCR));
+	pr_debug_hex(ioread8(port_ptr + UART_MCR));
+	pr_debug_hex(ioread8(port_ptr + UART_LSR));
+	pr_debug_hex(ioread8(port_ptr + UART_MSR));
 	return ret;
 }
 
@@ -539,11 +526,10 @@ int chrdev_region_init(char *dev_name)
 	int ret;
 	int d;
 	dev_t devid;
-_entry:
 	devid = MKDEV(major, 0);
 	ret = check(alloc_chrdev_region(&devid, 0, devs, dev_name));
 	major = MAJOR(devid);
-	trace_dec_ln(major);
+	pr_debug_dec(major);
 	cdev_init(&ldt_cdev, &ldt_fops);
 	check(cdev_add(&ldt_cdev, MKDEV(major, 0), devs));
 	ldt_class = class_create(THIS_MODULE, dev_name);
@@ -551,9 +537,8 @@ _entry:
 	ldt_dev = device_create(ldt_class, NULL, devid, NULL, "%s", dev_name);
 	for (d = 1; d < devs; d++)
 		device_create(ldt_class, NULL, MKDEV(major, d), NULL, "%s%d", dev_name, d);
-	trace_dec_ln(IS_ERR(ldt_dev));
-	trace_hex(ldt_dev);
-	trace_ln();
+	pr_debug_dec(IS_ERR(ldt_dev));
+	pr_debug_hex(ldt_dev);
 	return major;
 }
 
@@ -566,15 +551,11 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 	int ret;
 	char *data = NULL;
 	struct resource *r;
-_entry:
 	print_context();
-	trace_loc();
 	printk(KERN_DEBUG"%s %s %s", ldt_name, __DATE__, __TIME__);
-	trace_loc();
 	printk(KERN_DEBUG"pdev = %p ", pdev);
-	trace_dec(irq);
-	trace_dec(bufsize);
-	trace_ln();
+	pr_debug_dec(irq);
+	pr_debug_dec(bufsize);
 	in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO);
 	if (!in_buf) {
 		ret = -ENOMEM;
@@ -589,8 +570,7 @@ _entry:
 	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
 	if (pdev) {
 		dev_dbg(&pdev->dev, "%s:%d %s attaching driver\n", __file__, __LINE__, __func__);
-		trace_hex(pdev->dev.of_node);
-		trace_ln();
+		pr_debug_hex(pdev->dev.of_node);
 #ifdef CONFIG_OF_DEVICE
 		check(of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev));
 #endif
@@ -620,13 +600,12 @@ _entry:
 	ret = check(misc_register(&ldt_miscdev));
 	if (ret < 0)
 		goto exit;
-	trace_dec_ln(ldt_miscdev.minor);
+	pr_debug_dec(ldt_miscdev.minor);
 #else
 	chrdev_region_init(ldt_name);
 #endif
 exit:
-	trace_loc();
-	trace_dec_ln(ret);
+	pr_debug_dec(ret);
 	return ret;
 }
 
@@ -637,7 +616,6 @@ exit:
 static int __devexit ldt_remove(struct platform_device *pdev)
 {
 	int d;
-_entry:
 	if (pdev)
 		dev_dbg(&pdev->dev, "%s:%d %s detaching driver\n", __file__, __LINE__, __func__);
 	/* remove_proc_entry(ldt_name, NULL); depricated */
@@ -660,10 +638,12 @@ _entry:
 	if (port_r)
 		release_region(port, port_size);
 	if (irq) {
-		iowrite8(0, port_ptr + UART_IER);
-		iowrite8(0, port_ptr + UART_FCR);
-		iowrite8(0, port_ptr + UART_MCR);
-		ioread8(port_ptr + UART_RX);
+		if (uart_detected) {
+			iowrite8(0, port_ptr + UART_IER);
+			iowrite8(0, port_ptr + UART_FCR);
+			iowrite8(0, port_ptr + UART_MCR);
+			ioread8(port_ptr + UART_RX);
+		}
 		free_irq(irq, THIS_MODULE);
 	}
 	tasklet_kill(&ldt_tasklet);
@@ -675,8 +655,8 @@ _entry:
 		pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 0);
 		free_pages_exact(out_buf, bufsize);
 	}
-	trace_dec_ln(isr_counter);
-	trace_dec_ln(ldt_work_counter);
+	pr_debug_dec(isr_counter);
+	pr_debug_dec(ldt_work_counter);
 	if (port_ptr)
 		ioport_unmap(port_ptr);
 	return 0;
@@ -740,14 +720,12 @@ module_platform_driver(ldt_driver);
 static int ldt_init(void)
 {
 	int ret = 0;
-_entry:
 	ret = platform_driver_register(&ldt_driver);
 	return ret;
 }
 
 static void ldt_exit(void)
 {
-_entry:
 	platform_driver_unregister(&ldt_driver);
 }
 
@@ -764,7 +742,6 @@ module_exit(ldt_exit);
 static int ldt_init(void)
 {
 	int ret = 0;
-_entry:
 	/*
 	 *      Call probe function directly,
 	 *      bypassing platform_device infrastructure
@@ -776,7 +753,6 @@ _entry:
 static void ldt_exit(void)
 {
 	int res;
-_entry:
 	res = ldt_remove(NULL);
 }
 
