@@ -47,7 +47,6 @@
 #include <linux/kfifo.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
-#include <linux/proc_fs.h>
 #include <linux/module.h>
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>

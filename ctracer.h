@@ -1,7 +1,7 @@
 /*
 	Tracing utility for C
 
-	implemented in include-file only
+	implemented in single h-file
 
 	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
 
@@ -368,12 +368,13 @@ static inline int lookup_symbol_name(unsigned long addr, char *symbol)
 int lookup_symbol_name(unsigned long addr, char *symname);
 #endif
 
-#define _trace_enter_exit_() char _caller[200]; lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller);	\
-	char __attribute__((cleanup(__on_cleanup))) *_s; char _ret_msg[100]; _s = _ret_msg; \
+#define _trace_enter_exit_() char _caller[200]; \
+	lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller); \
+	char __attribute__((cleanup(__on_cleanup))) *_s; \
+	char _ret_msg[100]; _s = _ret_msg; \
 	snprintf(_ret_msg, sizeof(_ret_msg), "%s < %s }\n", _caller, __func__); \
 	tracef(SOL"%s > %s { @ %s:%d", _caller, __func__, __file__, __LINE__);
 
 /*__END_DECLS */
 #endif /* CTRACER_H_INCLUDED */
 #endif /* __ASSEMBLY__ */
-
