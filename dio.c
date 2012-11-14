@@ -71,7 +71,8 @@ _entry:
 		ret = size;
 		break;
 	case ioctl_io:
-		ioctl(dev, _IOC(_IOC_WRITE, ioctl_type, ioctl_num, size & _IOC_SIZEMASK), buf);
+		ioctl(dev, _IOC(_IOC_WRITE, ioctl_type, ioctl_num,
+					size & _IOC_SIZEMASK), buf);
 		break;
 	case file_io:
 	default:
@@ -96,7 +97,8 @@ _entry:
 		ret = size;
 		break;
 	case ioctl_io:
-		ioctl(dev, _IOC(_IOC_READ, ioctl_type, ioctl_num, size & _IOC_SIZEMASK), buf);
+		ioctl(dev, _IOC(_IOC_READ, ioctl_type, ioctl_num,
+					size & _IOC_SIZEMASK), buf);
 		ret = size;
 		break;
 	case file_io:
@@ -315,7 +317,8 @@ int main(int argc, char *argv[])
 	outbuf = malloc(buf_size);
 	chkne(dev = open(dev_name, O_CREAT | O_RDWR, 0666));
 	if (io_type == mmap_io) {
-		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE)-1));
+		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
+				MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE)-1));
 		if (mm == MAP_FAILED) {
 			warn("mmap() failed");
 			goto exit;

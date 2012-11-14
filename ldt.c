@@ -87,16 +87,6 @@ static DECLARE_WAIT_QUEUE_HEAD(ldt_readable);
 static spinlock_t fifo_lock;
 
 /*
- *	pages_flag - set or clear a flag for sequence of pages
- *
- *	more generic solution instead SetPageReserved, ClearPageReserved etc
- *
- * 	Popose to move pages_flag to linux/page-flags.h
- */
-
-extern void pages_flag(struct page *page, int pages, int mask, int value);
-
-/*
  *	ldt_received - called with data received from HW port
  *	Called from tasklet, which is fired from ISR or timer
  */
@@ -117,11 +107,11 @@ static void ldt_send(void *data, int size)
 		if (ioread8(port_ptr + UART_LSR) & UART_LSR_THRE)
 			iowrite8(*(char *)data, port_ptr + UART_TX);
 		else
-			pr_err("%s: %s\n",__func__, "UART overflow");
-	} else
-		/* emulate loopback  */
-	if (loopback)
-		ldt_received(data, size);
+			pr_err("%s: %s\n", __func__, "UART overflow");
+	} else {
+		if (loopback)
+			ldt_received(data, size);
+	}
 }
 
 /*
@@ -148,9 +138,10 @@ static void ldt_tasklet_func(unsigned long d)
 {
 	char data_out, data_in;
 	if (uart_detected) {
-		while (tx_ready() && kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
+		while (tx_ready() && kfifo_out_spinlocked(&out_fifo,
+					&data_out, sizeof(data_out), &fifo_lock)) {
 			pr_debug("UART_LSR=0x%02X\n", ioread8(port_ptr + UART_LSR));
-			pr_debug("%s: data_out=%d\n",__func__, data_out);
+			pr_debug("%s: data_out=%d\n", __func__, data_out);
 			if (data_out >= 32)
 				pr_debug("data_out = '%c' ", data_out);
 			ldt_send(&data_out, sizeof(data_out));
@@ -158,14 +149,14 @@ static void ldt_tasklet_func(unsigned long d)
 		while (rx_ready()) {
 			pr_debug("UART_LSR=0x%02X\n", ioread8(port_ptr + UART_LSR));
 			data_in = ioread8(port_ptr + UART_RX);
-			pr_debug("%s: data_in=%d\n",__func__, data_in);
+			pr_debug("%s: data_in=%d\n", __func__, data_in);
 			if (data_in >= 32)
 				pr_debug("data_out = '%c' ", data_in);
 			ldt_received(&data_in, sizeof(data_in));
 		}
 	} else {
 		while (kfifo_out_spinlocked(&out_fifo, &data_out, sizeof(data_out), &fifo_lock)) {
-			pr_debug("%s: data_out=%d\n",__func__, data_out);
+			pr_debug("%s: data_out=%d\n", __func__, data_out);
 			ldt_send(&data_out, sizeof(data_out));
 		}
 	}
@@ -216,18 +207,18 @@ static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 
 static int ldt_open(struct inode *inode, struct file *file)
 {
-	pr_debug("%s: imajor(inode)=%d\n",__func__, imajor(inode));
-	pr_debug("%s: iminor(inode)=%d\n",__func__, iminor(inode));
-	pr_debug("%s: file->f_flags & O_NONBLOCK=0x%X\n",__func__, file->f_flags & O_NONBLOCK);
+	pr_debug("%s: imajor=%d\n", __func__, imajor(inode));
+	pr_debug("%s: iminor=%d\n", __func__, iminor(inode));
+	pr_debug("%s: file->f_flags & O_NONBLOCK=0x%X\n", __func__, file->f_flags & O_NONBLOCK);
 	return 0;
 }
 
 static int ldt_release(struct inode *inode, struct file *file)
 {
-	pr_debug("%s: imajor(inode)=%d\n",__func__, imajor(inode));
-	pr_debug("%s: iminor(inode)=%d\n",__func__, iminor(inode));
-	pr_debug("%s: isr_counter=%d\n",__func__, isr_counter);
-	pr_debug("%s: ldt_work_counter=%d\n",__func__, ldt_work_counter);
+	pr_debug("%s: imajor=%d\n", __func__, imajor(inode));
+	pr_debug("%s: iminor=%d\n", __func__, iminor(inode));
+	pr_debug("%s: isr_counter=%d\n", __func__, isr_counter);
+	pr_debug("%s: ldt_work_counter=%d\n", __func__, ldt_work_counter);
 	return 0;
 }
 
@@ -237,7 +228,8 @@ static int ldt_release(struct inode *inode, struct file *file)
 
 static DEFINE_MUTEX(read_lock);
 
-static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff_t * ppos)
+static ssize_t ldt_read(struct file *file, char __user *buf,
+		size_t count, loff_t * ppos)
 {
 	int ret = 0;
 	unsigned int copied;
@@ -246,17 +238,18 @@ static ssize_t ldt_read(struct file *file, char __user * buf, size_t count, loff
 			ret = -EAGAIN;
 			goto exit;
 		} else {
-			pr_err("%s: ERR=%d %s\n",__func__, ret, "waiting");
-			ret = wait_event_interruptible(ldt_readable, !kfifo_is_empty(&in_fifo));
+			pr_err("%s: ERR=%d %s\n", __func__, ret, "waiting");
+			ret = wait_event_interruptible(ldt_readable,
+					!kfifo_is_empty(&in_fifo));
 			if (ret == -ERESTARTSYS) {
-				pr_err("%s: ERR=%d %s\n",__func__, ret, "interrupted");
+				pr_err("%s: ERR=%d %s\n", __func__, ret, "interrupted");
 				ret = -EINTR;
 				goto exit;
 			}
 		}
 	}
 	if (mutex_lock_interruptible(&read_lock)) {
-		pr_err("%s: ERR=%d %s\n",__func__, ret, "interrupted");
+		pr_err("%s: ERR=%d %s\n", __func__, ret, "interrupted");
 		return -EINTR;
 	}
 	ret = kfifo_to_user(&in_fifo, buf, count, &copied);
@@ -271,7 +264,8 @@ exit:
 
 static DEFINE_MUTEX(write_lock);
 
-static ssize_t ldt_write(struct file *file, const char __user * buf, size_t count, loff_t * ppos)
+static ssize_t ldt_write(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
 {
 	int ret;
 	unsigned int copied;
@@ -288,7 +282,7 @@ static ssize_t ldt_write(struct file *file, const char __user * buf, size_t coun
  *	polling
  */
 
-static unsigned int ldt_poll(struct file *file, poll_table * pt)
+static unsigned int ldt_poll(struct file *file, poll_table *pt)
 {
 	unsigned int mask = 0;
 	poll_wait(file, &ldt_readable, pt);
@@ -301,7 +295,7 @@ static unsigned int ldt_poll(struct file *file, poll_table * pt)
 	mask |= POLLHUP;	/* on output eof */
 	mask |= POLLERR;	/* on output error */
 #endif
-	pr_debug("%s: mask=0x%X\n",__func__, mask);
+	pr_debug("%s: mask=0x%X\n", __func__, mask);
 	return mask;
 }
 
@@ -309,9 +303,11 @@ static unsigned int ldt_poll(struct file *file, poll_table * pt)
  *	pages_flag - set or clear a flag for sequence of pages
  *
  *	more generic solution instead SetPageReserved, ClearPageReserved etc
+ *
+ *	Poposing to move pages_flag to linux/page-flags.h
  */
 
-void pages_flag(struct page *page, int pages, int mask, int value)
+static void pages_flag(struct page *page, int pages, int mask, int value)
 {
 	for (; pages; pages--, page++)
 		if (value)
@@ -334,7 +330,7 @@ static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EINVAL;
 	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(buf) >> PAGE_SHIFT,
 			    vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
-		pr_err("%s: %s\n",__func__, "remap_pfn_range failed");
+		pr_err("%s: %s\n", __func__, "remap_pfn_range failed");
 		return -EAGAIN;
 	}
 	return 0;
@@ -345,38 +341,41 @@ static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
  */
 
 #define trace_ioctl(nr) pr_debug("ioctl=(%c%c %c #%i %i)\n", \
-	(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', (_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
+	(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', \
+	(_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
 	_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
 
 static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 {
 	int ret = 0;
 	void __user *user = (void __user *)arg;
-	pr_debug("%s: cmnd=0x%X\n",__func__, cmnd);
-	pr_debug("%s: arg=0x%lX\n",__func__, arg);
+	pr_debug("%s: cmnd=0x%X\n", __func__, cmnd);
+	pr_debug("%s: arg=0x%lX\n", __func__, arg);
 	trace_ioctl(cmnd);
 	switch (_IOC_TYPE(cmnd)) {
-		case 'A':
-			switch (_IOC_NR(cmnd)) {
-				case 0:
-					if (_IOC_DIR(cmnd) == _IOC_WRITE) {
-						if(copy_from_user(in_buf, user, _IOC_SIZE(cmnd))) {
-							ret = -EFAULT;
-							goto exit;
-						}
-						memcpy(out_buf, in_buf, bufsize);
-						memset(in_buf, 0, bufsize);
-					}
-					if (_IOC_DIR(cmnd) == _IOC_READ) {
-						if(copy_to_user(user, out_buf, _IOC_SIZE(cmnd))) {
-							ret = -EFAULT;
-							goto exit;
-						}
-						memset(out_buf, 0, bufsize);
-					}
-					break;
+	case 'A':
+		switch (_IOC_NR(cmnd)) {
+		case 0:
+			if (_IOC_DIR(cmnd) == _IOC_WRITE) {
+				if (copy_from_user(in_buf, user,
+							_IOC_SIZE(cmnd))) {
+					ret = -EFAULT;
+					goto exit;
+				}
+				memcpy(out_buf, in_buf, bufsize);
+				memset(in_buf, 0, bufsize);
+			}
+			if (_IOC_DIR(cmnd) == _IOC_READ) {
+				if (copy_to_user(user, out_buf,
+							_IOC_SIZE(cmnd))) {
+					ret = -EFAULT;
+					goto exit;
+				}
+				memset(out_buf, 0, bufsize);
 			}
 			break;
+		}
+		break;
 	}
 exit:
 	return ret;
@@ -422,7 +421,7 @@ static int ldt_thread(void *data)
 	while (!kthread_should_stop()) {
 		ret = wait_for_completion_interruptible(&ldt_complete);
 		if (ret == -ERESTARTSYS) {
-			pr_err("%s: ERR=%d %s\n",__func__, ret, "interrupted");
+			pr_err("%s: ERR=%d %s\n", __func__, ret, "interrupted");
 			ret = -EINTR;
 			break;
 		}
@@ -442,12 +441,13 @@ static int uart_probe(void)
 	int ret = 0;
 	if (port) {
 		port_ptr = ioport_map(port, port_size);
-		pr_debug("%s: port_ptr=%p\n",__func__, port_ptr);
+		pr_debug("%s: port_ptr=%p\n", __func__, port_ptr);
 		port_r = request_region(port, port_size, KBUILD_MODNAME);
 		/* ignore error */
 	}
 	if (irq) {
-		ret = request_irq(irq, (void *)ldt_isr, IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
+		ret = request_irq(irq, (void *)ldt_isr,
+				IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
 		iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, port_ptr + UART_MCR);
 		uart_detected = (ioread8(port_ptr + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
 		pr_debug("UART_MSR=0x%02X\n", ioread8(port_ptr + UART_MSR));
@@ -455,17 +455,19 @@ static int uart_probe(void)
 		if (uart_detected) {
 			iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, port_ptr + UART_IER);
 			iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, port_ptr + UART_MCR);
-			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT, port_ptr + UART_FCR);
-			pr_debug("%s: loopback=%d\n",__func__, loopback);
+			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
+					port_ptr + UART_FCR);
+			pr_debug("%s: loopback=%d\n", __func__, loopback);
 			if (loopback)
-				iowrite8(ioread8(port_ptr + UART_MCR) | UART_MCR_LOOP, port_ptr + UART_MCR);
+				iowrite8(ioread8(port_ptr + UART_MCR) | UART_MCR_LOOP,
+						port_ptr + UART_MCR);
 		}
 		if (!uart_detected && loopback) {
 			pr_warn("Emulating loopback in software\n");
 			ret = -ENODEV;
 		}
 	}
-	pr_debug("%s: uart_detected=0x%X\n",__func__, uart_detected);
+	pr_debug("%s: uart_detected=0x%X\n", __func__, uart_detected);
 	pr_debug("UART_IER=0x%02X\n", ioread8(port_ptr + UART_IER));
 	pr_debug("UART_IIR=0x%02X\n", ioread8(port_ptr + UART_IIR));
 	pr_debug("UART_FCR=0x%02X\n", ioread8(port_ptr + UART_FCR));
@@ -488,10 +490,10 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 	int ret;
 	char *data = NULL;
 	struct resource *r;
-	printk(KERN_DEBUG"%s %s %s", KBUILD_MODNAME, __DATE__, __TIME__);
-	printk(KERN_DEBUG"pdev = %p ", pdev);
-	pr_debug("%s: irq=%d\n",__func__, irq);
-	pr_debug("%s: bufsize=%d\n",__func__, bufsize);
+	pr_debug("%s %s %s", KBUILD_MODNAME, __DATE__, __TIME__);
+	pr_debug("pdev = %p ", pdev);
+	pr_debug("%s: irq=%d\n", __func__, irq);
+	pr_debug("%s: bufsize=%d\n", __func__, bufsize);
 	in_buf = alloc_pages_exact(bufsize, GFP_KERNEL | __GFP_ZERO);
 	if (!in_buf) {
 		ret = -ENOMEM;
@@ -506,7 +508,7 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 	pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 1);
 	if (pdev) {
 		dev_dbg(&pdev->dev, "%s attaching device\n", __func__);
-		pr_debug("%s: pdev->dev.of_node=%p\n",__func__, pdev->dev.of_node);
+		pr_debug("%s: pdev->dev.of_node=%p\n", __func__, pdev->dev.of_node);
 #ifdef CONFIG_OF_DEVICE
 		of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 #endif
@@ -535,9 +537,9 @@ static __devinit int ldt_probe(struct platform_device *pdev)
 	ret = misc_register(&ldt_miscdev);
 	if (ret < 0)
 		goto exit;
-	pr_debug("%s: ldt_miscdev.minor=%d\n",__func__, ldt_miscdev.minor);
+	pr_debug("%s: ldt_miscdev.minor=%d\n", __func__, ldt_miscdev.minor);
 exit:
-	pr_debug("%s: ret=%d\n",__func__, ret);
+	pr_debug("%s: ret=%d\n", __func__, ret);
 	return ret;
 }
 
@@ -578,8 +580,8 @@ static int __devexit ldt_remove(struct platform_device *pdev)
 		pages_flag(virt_to_page(out_buf), PFN_UP(bufsize), PG_reserved, 0);
 		free_pages_exact(out_buf, bufsize);
 	}
-	pr_debug("%s: isr_counter=%d\n",__func__, isr_counter);
-	pr_debug("%s: ldt_work_counter=%d\n",__func__, ldt_work_counter);
+	pr_debug("%s: isr_counter=%d\n", __func__, isr_counter);
+	pr_debug("%s: ldt_work_counter=%d\n", __func__, ldt_work_counter);
 	if (port_ptr)
 		ioport_unmap(port_ptr);
 	return 0;

@@ -28,7 +28,7 @@
 	static int _passed; if (!_passed) { exp; }; _passed = 1; } while (0)
 
 #define check(a) \
-	(ret = a, ((ret < 0) ? pr_warning("%s:%i %s FAIL\n\t%i=%s\n", \
+	(ret = a, ((ret < 0) ? pr_warn("%s:%i %s FAIL\n\t%i=%s\n", \
 	__file__, __LINE__, __func__, ret, #a) : 0), ret)
 
 #define pr_debug_hex(h)	pr_debug("%s:%d %s %s = 0x%lX\n", \

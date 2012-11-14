@@ -78,7 +78,7 @@ static int __init configfs_example_init(void)
 	mutex_init(&ldt_subsys.su_mutex);
 	ret = configfs_register_subsystem(&ldt_subsys);
 	if (ret)
-		printk(KERN_ERR "Error %d while registering subsystem %s\n",
+		pr_err("Error %d while registering subsystem %s\n",
 		       ret, ldt_subsys.su_group.cg_item.ci_namebuf);
 	return ret;
 }

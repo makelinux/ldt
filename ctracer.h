@@ -353,7 +353,7 @@ extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
 static inline void __on_cleanup(char *s[])
 {
 #ifdef __KERNEL__
-	printk(KERN_DEBUG"%s", *s);
+	pr_debug(KERN_DEBUG"%s", *s);
 #else
 	fputs(*s, stderr);
 #endif
