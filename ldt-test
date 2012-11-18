@@ -79,8 +79,8 @@ fi
 # clean data
 echo | ./dio  --ignore_eof --loops 10 --delay 10 /dev/ttyS0 2> /dev/null > /dev/null
 
-sudo insmod ldt.ko loopback=$loopback
 sudo insmod ldt_plat_dev.ko
+sudo insmod ldt.ko loopback=$loopback
 
 tracing_start || true
 #. /sys/class/misc/ldt/uevent 2> /dev/null || true # get $MAJOR $MINOR
