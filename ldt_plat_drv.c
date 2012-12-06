@@ -6,21 +6,53 @@
  *	Dual BSD/GPL License
  *
  *	platform_driver template driver
+ *	Power Management (dev_pm_ops)
+ *	Device Tree (of_device_id)
  *
  */
 
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/of_platform.h>
+#include <linux/mod_devicetable.h>
+#include <linux/of_irq.h>
 #include "tracing.h"
+
+static int irq;
+static int port;
+static int port_size;
 
 static __devinit int ldt_plat_probe(struct platform_device *pdev)
 {
 	char *data = NULL;
 	struct resource *r;
 _entry:
-	if (pdev)
+	dev_dbg(&pdev->dev, "%s\n", __func__);
 		data = pdev->dev.platform_data;
+	irq = platform_get_irq(pdev, 0);
 	r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	pr_debug("%s: pdev->dev.of_node = %p\n", __func__, pdev->dev.of_node);
+#ifdef CONFIG_OF_DEVICE
+	if (pdev->dev.of_node) {
+		const __be32 * p;
+		int property;
+		of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+		p = of_get_property(pdev->dev.of_node, "property", NULL);
+		if (p)
+			property = be32_to_cpu(*p);
+	}
+#endif
+	//struct ldt_data *drvdata = platform_get_drvdata(pdev);
+	//platform_set_drvdata(pdev, drvdata);
+
+	data = dev_get_platdata(&pdev->dev);
+	pr_debug("%p %s\n", data, data);
+	r = platform_get_resource(pdev, IORESOURCE_IO, 0);
+	port = r->start;
+	port_size = resource_size(r);
+
 	return 0;
 }
 
@@ -30,36 +62,53 @@ _entry:
 	return 0;
 }
 
-static struct platform_driver ldt_plat_driver = {
-	.driver.name = "ldt_device_name",
-	.driver.owner = THIS_MODULE,
-	.probe = ldt_plat_probe,
-	.remove = __devexit_p(ldt_plat_remove),
+/*
+ *	template for OF FDT ID
+ *	(Open Firmware Flat Device Tree)
+ */
+
+static const struct of_device_id ldt_of_match[] = {
+	{.compatible = "linux-driver-template",},
+	{},
 };
 
-#ifdef module_platform_driver
-module_platform_driver(ldt_plat_driver);
+MODULE_DEVICE_TABLE(of, ldt_of_match);
+
+#ifdef CONFIG_PM
+
+static int ldt_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int ldt_resume(struct device *dev)
+{
+	return 0;
+}
+
+static const struct dev_pm_ops ldt_pm = {
+	.suspend = ldt_suspend,
+	.resume  = ldt_resume,
+};
+
+#define ldt_pm_ops (&ldt_pm)
 #else
-/*
- *	for releases before v3.1-12 without macro module_platform_driver
- */
-static int ldt_plat_drv_init(void)
-{
-	int ret = 0;
-_entry:
-	ret = platform_driver_register(&ldt_plat_driver);
-	return ret;
-}
-
-static void ldt_plat_drv_exit(void)
-{
-_entry:
-	platform_driver_unregister(&ldt_plat_driver);
-}
-
-module_init(ldt_plat_drv_init);
-module_exit(ldt_plat_drv_exit);
+#define ldt_pm_ops NULL
 #endif
+
+static struct platform_driver ldt_plat_driver = {
+	.driver = {
+		   .name	= "ldt_device_name",
+		   .owner	= THIS_MODULE,
+		   .pm		= ldt_pm_ops,
+		   .of_match_table = of_match_ptr(ldt_of_match),
+		   },
+	.probe = ldt_plat_probe,
+	.remove = __devexit_p(ldt_plat_remove),
+
+};
+
+module_platform_driver(ldt_plat_driver);
 
 MODULE_DESCRIPTION("LDT - Linux Driver Template: platform_driver template");
 MODULE_AUTHOR("Constantine Shulyupin <const@makelinux.net>");
