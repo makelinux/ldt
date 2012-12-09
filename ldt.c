@@ -148,21 +148,23 @@ static void ldt_tasklet_func(unsigned long d)
 
 	if (drvdata->uart_detected) {
 		while (tx_ready() && kfifo_out_spinlocked(&drvdata->out_fifo,
-					&data_out, sizeof(data_out), &drvdata->fifo_lock)) {
+					&data_out, sizeof(data_out),
+					&drvdata->fifo_lock)) {
 			wake_up_interruptible(&drvdata->writeable);
-			pr_debug("%s: data_out=%d %c\n", __func__, data_out, data_out >= 32 ? data_out : ' ');
+			pr_debug("data_out=%d %c\n", data_out, data_out >= 32 ? data_out : ' ');
 			ldt_send(data_out);
 		}
 		while (rx_ready()) {
 			data_in = ioread8(drvdata->port_ptr + UART_RX);
-			pr_debug("%s: data_in=%d %c\n", __func__, data_in, data_in >= 32 ? data_in : ' ');
+			pr_debug("data_in=%d %c\n", data_in, data_in >= 32 ? data_in : ' ');
 			ldt_received(data_in);
 		}
 	} else {
-		while (kfifo_out_spinlocked(&drvdata->out_fifo, &data_out, sizeof(data_out),
+		while (kfifo_out_spinlocked(&drvdata->out_fifo,
+					&data_out, sizeof(data_out),
 					&drvdata->fifo_lock)) {
 			wake_up_interruptible(&drvdata->writeable);
-			pr_debug("%s: data_out=%d\n", __func__, data_out);
+			pr_debug("data_out=%d\n", data_out);
 			ldt_send(data_out);
 		}
 	}
@@ -214,7 +216,7 @@ static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 
 static int ldt_open(struct inode *inode, struct file *file)
 {
-	pr_debug("%s: from %s\n", __func__, current->comm);
+	pr_debug("%s from %s\n", __func__, current->comm);
 	/* client related data can be allocated here and
 	   stored in file->private_data */
 	return 0;
@@ -222,7 +224,7 @@ static int ldt_open(struct inode *inode, struct file *file)
 
 static int ldt_release(struct inode *inode, struct file *file)
 {
-	pr_debug("%s: from %s\n", __func__,current->comm);
+	pr_debug("%s from %s\n", __func__, current->comm);
 	/* client related data can be retrived from file->private_data
 	   and released here */
 	return 0;
@@ -234,7 +236,7 @@ static ssize_t ldt_read(struct file *file, char __user *buf,
 	int ret = 0;
 	unsigned int copied;
 
-	pr_debug("%s: from %s\n", __func__,current->comm);
+	pr_debug("%s from %s\n", __func__, current->comm);
 	if (kfifo_is_empty(&drvdata->in_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			return -EAGAIN;
@@ -243,7 +245,7 @@ static ssize_t ldt_read(struct file *file, char __user *buf,
 			ret = wait_event_interruptible(drvdata->readable,
 					!kfifo_is_empty(&drvdata->in_fifo));
 			if (ret == -ERESTARTSYS) {
-				pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "interrupted");
+				pr_err("%s\n", "interrupted");
 				return -EINTR;
 			}
 		}
@@ -261,7 +263,7 @@ static ssize_t ldt_write(struct file *file, const char __user *buf,
 	int ret;
 	unsigned int copied;
 
-	pr_debug("%s: from %s\n", __func__,current->comm);
+	pr_debug("%s from %s\n", __func__, current->comm);
 	if (kfifo_is_full(&drvdata->out_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			return -EAGAIN;
@@ -269,7 +271,7 @@ static ssize_t ldt_write(struct file *file, const char __user *buf,
 			ret = wait_event_interruptible(drvdata->writeable,
 					!kfifo_is_full(&drvdata->out_fifo));
 			if (ret == -ERESTARTSYS) {
-				pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "interrupted");
+				pr_err("%s\n", "interrupted");
 				return -EINTR;
 			}
 		}
@@ -328,7 +330,7 @@ static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EINVAL;
 	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(buf) >> PAGE_SHIFT,
 			    vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "remap_pfn_range failed");
+		pr_err("%s\n", "remap_pfn_range failed");
 		return -EAGAIN;
 	}
 	return 0;
@@ -363,17 +365,18 @@ static int uart_probe(void)
 	if (port) {
 		port_r = request_region(port, port_size, KBUILD_MODNAME);
 		if (!port_r) {
-			pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "request_region failed");
-			return -EBUSY;
+			pr_err("%s\n", "request_region failed");
+			//return -EBUSY;
 		}
 		drvdata->port_ptr = ioport_map(port, port_size);
-		pr_debug("%s: drvdata->port_ptr=%p\n", __func__, drvdata->port_ptr);
+		pr_debug("drvdata->port_ptr=%p\n", drvdata->port_ptr);
 		if (!drvdata->port_ptr) {
-			pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "ioport_map failed");
+			pr_err("%s\n", "ioport_map failed");
 			return -ENODEV;
 		}
 	}
-	if (irq && drvdata->port_ptr) {
+	if (!irq || !drvdata->port_ptr)
+		goto exit;
 		/*
 		 *	Minimal configuration of UART for trivial I/O opertaions
 		 *	and ISR just to porform basic tests.
@@ -385,17 +388,19 @@ static int uart_probe(void)
 		ret = request_irq(irq, ldt_isr,
 				IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
 		if (ret < 0) {
-			pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "request_irq failed");
+		pr_err("%s\n", "request_irq failed");
 			return ret;
 		}
-		iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP, drvdata->port_ptr + UART_MCR);
-		drvdata->uart_detected = (ioread8(drvdata->port_ptr + UART_MSR) & 0xF0) == (UART_MSR_DCD | UART_MSR_CTS);
-		pr_debug("UART_MSR=0x%02X\n", ioread8(drvdata->port_ptr + UART_MSR));
-		pr_debug("%s: drvdata->uart_detected=0x%X\n", __func__, drvdata->uart_detected);
+	iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP,
+			drvdata->port_ptr + UART_MCR);
+	drvdata->uart_detected = (ioread8(drvdata->port_ptr + UART_MSR) & 0xF0)
+		== (UART_MSR_DCD | UART_MSR_CTS);
 
 		if (drvdata->uart_detected) {
-			iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI, drvdata->port_ptr + UART_IER);
-			iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2, drvdata->port_ptr + UART_MCR);
+		iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI,
+				drvdata->port_ptr + UART_IER);
+		iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2,
+				drvdata->port_ptr + UART_MCR);
 			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
 					drvdata->port_ptr + UART_FCR);
 			pr_debug("%s: loopback=%d\n", __func__, loopback);
@@ -405,7 +410,7 @@ static int uart_probe(void)
 		}
 		if (!drvdata->uart_detected && loopback)
 			pr_warn("Emulating loopback in software\n");
-	}
+exit:
 	return ret;
 }
 
@@ -473,7 +478,7 @@ static __devinit int ldt_init(void)
 
 	drvdata = ldt_data_init();
 	if (!drvdata) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "ldt_data_init failed");
+		pr_err("ldt_data_init failed\n");
 		goto exit;
 	}
 
@@ -500,7 +505,7 @@ static __devinit int ldt_init(void)
 	 */
 	ret = uart_probe();
 	if (ret < 0) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "uart_probe failed");
+		pr_err("uart_probe failed\n");
 		goto exit;
 	}
 	mod_timer(&ldt_timer, jiffies + HZ / 10);
