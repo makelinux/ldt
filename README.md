@@ -8,7 +8,7 @@ module, platform driver, file operations (read/write, mmap, ioctl, blocking and 
 
 Just run
 
-git clone git://github.com/makelinux/ldt.git && cd ldt && ./ldt-test
+git clone git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test
 
 and explore sources.
 

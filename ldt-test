@@ -51,7 +51,6 @@ sudo dmesg -c > /dev/null
 
 # configure UART because it is used for demostration of the driver
 stty -F /dev/ttyS0 115200
-make -s
 set -o errexit
 
 #
