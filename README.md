@@ -8,25 +8,28 @@ module, platform driver, file operations (read/write, mmap, ioctl, blocking and 
 
 Just run
 
-git clone git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test
+git clone git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test && ./misc_drv_test
 
 and explore sources.
 
 ## Files:
 
-Main source file of LDT: 
+Main source file of LDT:
 **[ldt.c](https://github.com/makelinux/ldt/blob/master/ldt.c)**
 
 Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/ldt-test)**
 
 Generic testing utility for Device I/O: **[dio.c](https://github.com/makelinux/ldt/blob/master/dio.c)**
 
+Simple misc driver with read, write, fifo tasklet and IRQ:
+**[misc_drv.c](https://github.com/makelinux/ldt/blob/master/misc_drv.c)**
+
 Browse the rest of source: https://github.com/makelinux/ldt/
 
 
 ## Compiled and tested on Linux versions:
 
-v3.6-rc5 
+v3.6-rc5
 
 3.2.0-30-generic-pae (Ubuntu 12.04 LTS)
 
