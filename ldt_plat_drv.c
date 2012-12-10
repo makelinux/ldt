@@ -44,8 +44,11 @@ _entry:
 			property = be32_to_cpu(*p);
 	}
 #endif
-	//struct ldt_data *drvdata = platform_get_drvdata(pdev);
-	//platform_set_drvdata(pdev, drvdata);
+	/*
+	   sample code for drvdata usage:
+	   struct ldt_data *drvdata = platform_get_drvdata(pdev);
+	   platform_set_drvdata(pdev, drvdata);
+	*/
 
 	data = dev_get_platdata(&pdev->dev);
 	pr_debug("%p %s\n", data, data);

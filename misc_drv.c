@@ -18,7 +18,6 @@
  *	kfifo
  *	interrupt
  *	tasklet
- *	timer
  *	driven by IRQ 6
  *
  *	Run test script misc-drv-test to test the driver
@@ -31,7 +30,6 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
-#include <linux/timer.h>
 #include <linux/kfifo.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
@@ -41,6 +39,9 @@
 #include <linux/serial_reg.h>
 #include <linux/cdev.h>
 #include <asm/apic.h>
+
+#undef pr_fmt
+#define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
 
 static int port = 0x3f4;
 module_param(port, int, 0);
@@ -54,6 +55,7 @@ static int irq = 6;
 module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "interrupt request number, default 6 - floppy");
 
+
 #define FIFO_SIZE 128		/* must be power of two */
 
 #define MISC_DRV_TX	0
@@ -61,6 +63,7 @@ MODULE_PARM_DESC(irq, "interrupt request number, default 6 - floppy");
 #define MISC_DRV_TX_FULL	1
 #define MISC_DRV_RX_READY	1
 
+static char port_emulation[2];
 
 /**
  * struct misc_drv_data - the driver data
@@ -83,9 +86,7 @@ struct misc_drv_data {
 	spinlock_t fifo_lock;
 	wait_queue_head_t readable, writeable;
 	struct tasklet_struct misc_drv_tasklet;
-	struct timer_list misc_drv_timer;
-	//void __iomem *port_ptr;
-	void *port_ptr;
+	void __iomem *port_ptr;
 	struct resource *port_res;
 };
 
@@ -95,16 +96,14 @@ static void misc_drv_tasklet_func(unsigned long d)
 {
 	char data_out, data_in;
 	struct misc_drv_data *drvdata = (void*) d;
-	int tx_ready, rx_ready;
 
-	tx_ready = !ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL);
-
-	while (tx_ready && kfifo_out_spinlocked(&drvdata->out_fifo,
+	while (	!ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL)
+			&& kfifo_out_spinlocked(&drvdata->out_fifo,
 				&data_out, sizeof(data_out), &drvdata->fifo_lock)) {
 		wake_up_interruptible(&drvdata->writeable);
-		pr_debug("%s: data_out=%d %c\n", __func__, data_out, data_out >= 32 ? data_out : ' ');
+		pr_debug("data_out=%d %c\n", data_out, data_out >= 32 ? data_out : ' ');
 		iowrite8(data_out, drvdata->port_ptr + MISC_DRV_TX);
-		/* set flag full and implicitly flag ready */
+		/* set full flag and implicitly ready flag */
 		iowrite8(1, drvdata->port_ptr + MISC_DRV_TX_FULL);
 		/*
 		   In regular drivers hardware invokes interrupts.
@@ -112,56 +111,30 @@ static void misc_drv_tasklet_func(unsigned long d)
 		   we simulate interrupt invocation with function send_IPI_all.
 		   In driver, which works with real hardware this is not required.
 		 */
-		//apic->send_IPI_all(IRQ0_VECTOR+irq);
+		apic->send_IPI_all(IRQ0_VECTOR+irq);
 	}
 	while (ioread8(drvdata->port_ptr + MISC_DRV_RX_READY)) {
 		data_in = ioread8(drvdata->port_ptr + MISC_DRV_RX);
-		pr_debug("%s: data_in=%d %c\n", __func__, data_in, data_in >= 32 ? data_in : ' ');
+		pr_debug("data_in=%d %c\n", data_in, data_in >= 32 ? data_in : ' ');
 		kfifo_in_spinlocked(&drvdata->in_fifo, &data_in,
 			sizeof(data_in), &drvdata->fifo_lock);
 		wake_up_interruptible(&drvdata->readable);
-		/* clear flag ready and implicitly flag full */
+		/* clear ready flag and implicitly full flag */
 		iowrite8(0, drvdata->port_ptr + MISC_DRV_RX_READY);
 	}
 }
 
-/*
- *	interrupt section
- */
-
-static int isr_counter;
-
 static irqreturn_t misc_drv_isr(int irq, void *d)
 {
 	struct misc_drv_data *drvdata = (void*) d;
-	isr_counter++;
-	//tasklet_schedule(&drvdata->misc_drv_tasklet);
-	return IRQ_HANDLED;	/* our IRQ */
-}
 
-/*
- *	timer section
- */
-
-static void misc_drv_timer_func(unsigned long d)
-{
-	struct misc_drv_data *drvdata = (void*) d;
-	/*
-	 *      this timer is used just to fire drvdata->misc_drv_tasklet,
-	 *      because there is no interrupts in loopback mode
-	 */
-	//if (loopback)
 	tasklet_schedule(&drvdata->misc_drv_tasklet);
-	mod_timer(&drvdata->misc_drv_timer, jiffies + HZ / 100);
+	return IRQ_HANDLED;
 }
-
-/*
- *	file_operations section
- */
 
 static int misc_drv_open(struct inode *inode, struct file *file)
 {
-	pr_debug("%s: from %s\n", __func__, current->comm);
+	pr_debug("from %s\n", current->comm);
 	/* client related data can be allocated here and
 	   stored in file->private_data */
 	return 0;
@@ -169,7 +142,7 @@ static int misc_drv_open(struct inode *inode, struct file *file)
 
 static int misc_drv_release(struct inode *inode, struct file *file)
 {
-	pr_debug("%s: from %s\n", __func__,current->comm);
+	pr_debug("from %s\n", current->comm);
 	/* client related data can be retrieved from file->private_data
 	   and released here */
 	return 0;
@@ -181,16 +154,16 @@ static ssize_t misc_drv_read(struct file *file, char __user *buf,
 	int ret = 0;
 	unsigned int copied;
 
-	pr_debug("%s: from %s\n", __func__, current->comm);
+	pr_debug("from %s\n", current->comm);
 	if (kfifo_is_empty(&drvdata->in_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			return -EAGAIN;
 		} else {
-			pr_debug("%s: %s\n", __func__, "waiting");
+			pr_debug("%s\n", "waiting");
 			ret = wait_event_interruptible(drvdata->readable,
 					!kfifo_is_empty(&drvdata->in_fifo));
 			if (ret == -ERESTARTSYS) {
-				pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "interrupted");
+				pr_err("interrupted\n");
 				return -EINTR;
 			}
 		}
@@ -199,8 +172,7 @@ static ssize_t misc_drv_read(struct file *file, char __user *buf,
 		return -EINTR;
 	ret = kfifo_to_user(&drvdata->in_fifo, buf, count, &copied);
 	mutex_unlock(&drvdata->read_lock);
-	trvd(ret);
-	trvd(copied);
+
 	return ret ? ret : copied;
 }
 
@@ -209,10 +181,8 @@ static ssize_t misc_drv_write(struct file *file, const char __user *buf,
 {
 	int ret;
 	unsigned int copied;
-	trl();
-	trvp(drvdata);
 
-	pr_debug("%s: from %s\n", __func__,current->comm);
+	pr_debug("from %s\n", current->comm);
 	if (kfifo_is_full(&drvdata->out_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			return -EAGAIN;
@@ -220,7 +190,7 @@ static ssize_t misc_drv_write(struct file *file, const char __user *buf,
 			ret = wait_event_interruptible(drvdata->writeable,
 					!kfifo_is_full(&drvdata->out_fifo));
 			if (ret == -ERESTARTSYS) {
-				pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "interrupted");
+				pr_err("interrupted\n");
 				return -EINTR;
 			}
 		}
@@ -230,6 +200,7 @@ static ssize_t misc_drv_write(struct file *file, const char __user *buf,
 	ret = kfifo_from_user(&drvdata->out_fifo, buf, count, &copied);
 	mutex_unlock(&drvdata->write_lock);
 	tasklet_schedule(&drvdata->misc_drv_tasklet);
+
 	return ret ? ret : copied;
 }
 
@@ -249,23 +220,6 @@ static unsigned int misc_drv_poll(struct file *file, poll_table *pt)
 	mask |= POLLERR;
 */
 	return mask;
-}
-
-/*
- *	pages_flag - set or clear a flag for sequence of pages
- *
- *	more generic solution instead SetPageReserved, ClearPageReserved etc
- *
- *	Poposing to move pages_flag to linux/page-flags.h
- */
-
-static void pages_flag(struct page *page, int page_num, int mask, int value)
-{
-	for (; page_num; page_num--, page++)
-		if (value)
-			__set_bit(mask, &page->flags);
-		else
-			__clear_bit(mask, &page->flags);
 }
 
 static const struct file_operations misc_drv_fops = {
@@ -291,13 +245,11 @@ static void misc_drv_cleanup(void)
 {
 	if (misc_drv_dev.this_device)
 		misc_deregister(&misc_drv_dev);
-	//del_timer(&drvdata->misc_drv_timer);
 	if (irq) {
 		free_irq(irq, drvdata);
 	}
 	tasklet_kill(&drvdata->misc_drv_tasklet);
 
-	pr_debug("%s: isr_counter=%d\n", __func__, isr_counter);
 	if (drvdata->port_ptr) ioport_unmap(drvdata->port_ptr);
 	if (drvdata->port_res)
 		release_region(port, port_size);
@@ -311,8 +263,6 @@ struct misc_drv_data * misc_drv_data_init(void)
 	drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)
 		return NULL;
-	trl();
-	trvp(drvdata);
 	init_waitqueue_head(&drvdata->readable);
 	init_waitqueue_head(&drvdata->writeable);
 	INIT_KFIFO(drvdata->in_fifo);
@@ -320,7 +270,6 @@ struct misc_drv_data * misc_drv_data_init(void)
 	mutex_init(&drvdata->read_lock);
 	mutex_init(&drvdata->write_lock);
 	tasklet_init(&drvdata->misc_drv_tasklet, misc_drv_tasklet_func, (unsigned long)drvdata);
-	//setup_timer(&drvdata->misc_drv_timer, misc_drv_timer_func,(unsigned long)drvdata);
 	return drvdata;
 }
 
@@ -334,41 +283,43 @@ static __devinit int misc_drv_init(void)
 
 	drvdata = misc_drv_data_init();
 	if (!drvdata) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "misc_drv_data_init failed");
+		pr_err("misc_drv_data_init failed\n");
 		goto exit;
 	}
 
 	drvdata->port_res = request_region(port, port_size, KBUILD_MODNAME);
 	if (!drvdata->port_res) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "request_region failed");
+		pr_err("request_region failed\n");
 		return -EBUSY;
 	}
-	//drvdata->port_ptr = a;
-
-	drvdata->port_ptr = ioport_map(port, port_size);
-	pr_debug("%s: drvdata->port_ptr=%p\n", __func__, drvdata->port_ptr);
+	/*
+	   Real port can mappled with function with ioport_map:
+	   drvdata->port_ptr = ioport_map(port, port_size);
+	   But, because we use emulation mode, we use array instead mapped ports
+	*/
+	drvdata->port_ptr = port_emulation;
 	if (!drvdata->port_ptr) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "ioport_map failed");
+		pr_err("ioport_map failed\n");
 		return -ENODEV;
 	}
-	trvp(drvdata->port_ptr);
-
-	isr_counter = 0;
+	/* clear ports */
+	iowrite8(0, drvdata->port_ptr + MISC_DRV_TX);
+	iowrite8(0, drvdata->port_ptr + MISC_DRV_TX_FULL);
 
 	ret = misc_register(&misc_drv_dev);
 	if (ret < 0) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "misc_register failed");
+		pr_err("misc_register failed\n");
 		goto exit;
 	}
-	pr_debug("%s: misc_drv_dev.minor=%d\n", __func__, misc_drv_dev.minor);
+	pr_debug("misc_drv_dev.minor=%d\n", misc_drv_dev.minor);
 	ret = request_irq(irq, misc_drv_isr, 0, KBUILD_MODNAME, drvdata);
 	if (ret < 0) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "request_irq failed");
+		pr_err("request_irq failed\n");
 		return ret;
 	}
 
 exit:
-	pr_debug("%s: ret=%d\n", __func__, ret);
+	pr_debug("ret=%d\n", ret);
 	if (ret < 0)
 		misc_drv_cleanup();
 	return ret;

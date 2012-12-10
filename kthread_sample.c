@@ -10,7 +10,7 @@ static int thread_sample(void *data)
 	while (!kthread_should_stop()) {
 		ret = wait_for_completion_interruptible(&completion);
 		if (ret == -ERESTARTSYS) {
-			pr_debug("%s: %s\n", __func__, "interrupted");
+			pr_debug("interrupted\n");
 			return -EINTR;
 		}
 		/*
