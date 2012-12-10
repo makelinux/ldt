@@ -256,7 +256,7 @@ static void misc_drv_cleanup(void)
 	kfree(drvdata);
 }
 
-struct misc_drv_data * misc_drv_data_init(void)
+static struct misc_drv_data * misc_drv_data_init(void)
 {
 	struct misc_drv_data *drvdata;
 
@@ -297,7 +297,7 @@ static __devinit int misc_drv_init(void)
 	   drvdata->port_ptr = ioport_map(port, port_size);
 	   But, because we use emulation mode, we use array instead mapped ports
 	*/
-	drvdata->port_ptr = port_emulation;
+	drvdata->port_ptr = (void __iomem *) port_emulation;
 	if (!drvdata->port_ptr) {
 		pr_err("ioport_map failed\n");
 		return -ENODEV;

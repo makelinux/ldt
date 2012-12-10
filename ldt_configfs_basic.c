@@ -21,10 +21,14 @@
 static int parameter;
 
 static struct configfs_attribute ldt_parameter_attr = {
-	.ca_owner = THIS_MODULE, .ca_name = "parameter", .ca_mode = S_IRUGO | S_IWUSR };
+	.ca_owner = THIS_MODULE, .ca_name = "parameter",
+	.ca_mode = S_IRUGO | S_IWUSR
+};
 
 static struct configfs_attribute ldt_description_attr = {
-	.ca_owner = THIS_MODULE, .ca_name = "description", .ca_mode = S_IRUGO };
+	.ca_owner = THIS_MODULE, .ca_name = "description",
+	.ca_mode = S_IRUGO
+};
 
 static struct configfs_attribute *ldt_attrs[] = {
 	&ldt_description_attr,

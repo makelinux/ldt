@@ -35,7 +35,7 @@ static struct resource ldt_resource[] = {
 	},
 };
 
-void ldt_dev_release(struct device *dev)
+static void ldt_dev_release(struct device *dev)
 {
 }
 

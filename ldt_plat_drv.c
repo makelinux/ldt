@@ -35,7 +35,7 @@ _entry:
 	pr_debug("%s: pdev->dev.of_node = %p\n", __func__, pdev->dev.of_node);
 #ifdef CONFIG_OF_DEVICE
 	if (pdev->dev.of_node) {
-		const __be32 * p;
+		const __be32 *p;
 		int property;
 		of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);

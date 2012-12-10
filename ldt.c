@@ -367,12 +367,12 @@ static int uart_probe(void)
 
 	if (port) {
 		/*
-		port_r = request_region(port, port_size, KBUILD_MODNAME);
-		if (!port_r) {
-			pr_err("%s\n", "request_region failed");
-			return -EBUSY;
-		}
-		*/
+		   port_r = request_region(port, port_size, KBUILD_MODNAME);
+		   if (!port_r) {
+		   pr_err("%s\n", "request_region failed");
+		   return -EBUSY;
+		   }
+		 */
 		drvdata->port_ptr = ioport_map(port, port_size);
 		pr_debug("drvdata->port_ptr=%p\n", drvdata->port_ptr);
 		if (!drvdata->port_ptr) {
@@ -382,39 +382,39 @@ static int uart_probe(void)
 	}
 	if (!irq || !drvdata->port_ptr)
 		goto exit;
-		/*
-		 *	Minimal configuration of UART for trivial I/O opertaions
-		 *	and ISR just to porform basic tests.
-		 *	Some configuration of UART is not touched and reused.
-		 *
-		 *	This minimal configiration of UART is based on
-		 *	full UART driver drivers/tty/serial/8250/8250.c
-		 */
-		ret = request_irq(irq, ldt_isr,
-				IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
-		if (ret < 0) {
+	/*
+	 *	Minimal configuration of UART for trivial I/O opertaions
+	 *	and ISR just to porform basic tests.
+	 *	Some configuration of UART is not touched and reused.
+	 *
+	 *	This minimal configiration of UART is based on
+	 *	full UART driver drivers/tty/serial/8250/8250.c
+	 */
+	ret = request_irq(irq, ldt_isr,
+			IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
+	if (ret < 0) {
 		pr_err("%s\n", "request_irq failed");
-			return ret;
-		}
+		return ret;
+	}
 	iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP,
 			drvdata->port_ptr + UART_MCR);
 	drvdata->uart_detected = (ioread8(drvdata->port_ptr + UART_MSR) & 0xF0)
 		== (UART_MSR_DCD | UART_MSR_CTS);
 
-		if (drvdata->uart_detected) {
+	if (drvdata->uart_detected) {
 		iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI,
 				drvdata->port_ptr + UART_IER);
 		iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2,
 				drvdata->port_ptr + UART_MCR);
-			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
-					drvdata->port_ptr + UART_FCR);
-			pr_debug("loopback=%d\n", loopback);
-			if (loopback)
-				iowrite8(ioread8(drvdata->port_ptr + UART_MCR) | UART_MCR_LOOP,
-						drvdata->port_ptr + UART_MCR);
-		}
-		if (!drvdata->uart_detected && loopback)
-			pr_warn("Emulating loopback in software\n");
+		iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
+				drvdata->port_ptr + UART_FCR);
+		pr_debug("loopback=%d\n", loopback);
+		if (loopback)
+			iowrite8(ioread8(drvdata->port_ptr + UART_MCR) | UART_MCR_LOOP,
+					drvdata->port_ptr + UART_MCR);
+	}
+	if (!drvdata->uart_detected && loopback)
+		pr_warn("Emulating loopback in software\n");
 exit:
 	return ret;
 }
@@ -458,7 +458,7 @@ static void ldt_cleanup(void)
 	kfree(drvdata);
 }
 
-struct ldt_data * ldt_data_init(void)
+static struct ldt_data *ldt_data_init(void)
 {
 	struct ldt_data *drvdata;
 

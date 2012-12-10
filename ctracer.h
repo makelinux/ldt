@@ -25,11 +25,12 @@
 #define CTRACER_H_INCLUDED
 extern __thread int ret;
 
-#define multistatement(ms)	ms	/* trick to bypass checkpatch.pl error */
+#define multistatement(ms) ms /* trick to bypass checkpatch.pl error */
 /*
 #define _entry multistatement(trllog(); goto _entry; _entry)
 */
-#define _entry multistatement(_trace_enter_exit_(); trln(); goto _entry_second; _entry_second)
+#define _entry multistatement(_trace_enter_exit_(); \
+	trln(); goto _entry_second; _entry_second)
 /*
 #define _entry once(trl()); goto _entry; _entry
 #define return trlm("} "); return
