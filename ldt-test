@@ -117,6 +117,16 @@ echo expected $data
 echo received $received
 fi
 
+data=123ioctl
+received=`sudo echo $data | ./dio --ioctl /dev/ldt`
+if [ "$data" == "$received" ]; then
+echo -e "${GREEN}LDT ioctl test passed$NOCOLOR"
+else
+echo -e "${RED}LDT ioctl test failed$NOCOLOR"
+echo expected $data
+echo received $received
+fi
+
 sudo ls -l /sys/kernel/debug/ldt
 
 tracing_stop || true

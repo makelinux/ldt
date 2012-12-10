@@ -14,6 +14,7 @@
  *		blocking read and write
  *		polling
  *		mmap
+ *		ioctl
  *	kfifo
  *	completion
  *	interrupt
@@ -339,6 +340,56 @@ static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 }
 
+#define trace_ioctl(nr) pr_debug("ioctl=(%c%c %c #%i %i)\n", \
+	(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', \
+	(_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
+	_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
+
+static DEFINE_MUTEX(ioctl_lock);
+
+static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
+{
+	int ret = 0;
+	void __user *user = (void __user *)arg;
+
+	if (mutex_lock_interruptible(&ioctl_lock))
+		return -EINTR;
+	pr_debug("%s:\n", __func__);
+	pr_debug("cmnd=0x%X\n", cmnd);
+	pr_debug("arg=0x%lX\n", arg);
+	trace_ioctl(cmnd);
+	switch (_IOC_TYPE(cmnd)) {
+	case 'A':
+		switch (_IOC_NR(cmnd)) {
+		case 0:
+			if (_IOC_DIR(cmnd) == _IOC_WRITE) {
+				if (copy_from_user(drvdata->in_buf, user,
+							_IOC_SIZE(cmnd))) {
+					ret = -EFAULT;
+					goto exit;
+				}
+				/* copy data from in_buf to out_buf to emulate loopback for testing */
+				memcpy(drvdata->out_buf, drvdata->in_buf, bufsize);
+				memset(drvdata->in_buf, 0, bufsize);
+			}
+			if (_IOC_DIR(cmnd) == _IOC_READ) {
+				if (copy_to_user(user, drvdata->out_buf,
+							_IOC_SIZE(cmnd))) {
+					ret = -EFAULT;
+					goto exit;
+				}
+				memset(drvdata->out_buf, 0, bufsize);
+			}
+			break;
+		}
+		break;
+	}
+exit:
+	mutex_unlock(&ioctl_lock);
+	return ret;
+}
+
+
 static const struct file_operations ldt_fops = {
 	.owner	= THIS_MODULE,
 	.open	= ldt_open,
@@ -347,6 +398,7 @@ static const struct file_operations ldt_fops = {
 	.write	= ldt_write,
 	.poll	= ldt_poll,
 	.mmap	= ldt_mmap,
+	.unlocked_ioctl	= ldt_ioctl,
 };
 
 static struct miscdevice ldt_miscdev = {
