@@ -46,6 +46,9 @@
 #include <linux/debugfs.h>
 #include <linux/cdev.h>
 
+#undef pr_fmt
+#define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
+
 static int port = 0x3f8;
 module_param(port, int, 0);
 MODULE_PARM_DESC(port, "io port number, default 0x3f8 - UART");
@@ -216,7 +219,7 @@ static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
 
 static int ldt_open(struct inode *inode, struct file *file)
 {
-	pr_debug("%s from %s\n", __func__, current->comm);
+	pr_debug("from %s\n", current->comm);
 	/* client related data can be allocated here and
 	   stored in file->private_data */
 	return 0;
@@ -224,7 +227,7 @@ static int ldt_open(struct inode *inode, struct file *file)
 
 static int ldt_release(struct inode *inode, struct file *file)
 {
-	pr_debug("%s from %s\n", __func__, current->comm);
+	pr_debug("from %s\n", current->comm);
 	/* client related data can be retrived from file->private_data
 	   and released here */
 	return 0;
@@ -236,12 +239,12 @@ static ssize_t ldt_read(struct file *file, char __user *buf,
 	int ret = 0;
 	unsigned int copied;
 
-	pr_debug("%s from %s\n", __func__, current->comm);
+	pr_debug("from %s\n", current->comm);
 	if (kfifo_is_empty(&drvdata->in_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			return -EAGAIN;
 		} else {
-			pr_debug("%s: %s\n", __func__, "waiting");
+			pr_debug("waiting\n");
 			ret = wait_event_interruptible(drvdata->readable,
 					!kfifo_is_empty(&drvdata->in_fifo));
 			if (ret == -ERESTARTSYS) {
@@ -263,7 +266,7 @@ static ssize_t ldt_write(struct file *file, const char __user *buf,
 	int ret;
 	unsigned int copied;
 
-	pr_debug("%s from %s\n", __func__, current->comm);
+	pr_debug("from %s\n", current->comm);
 	if (kfifo_is_full(&drvdata->out_fifo)) {
 		if (file->f_flags & O_NONBLOCK) {
 			return -EAGAIN;
@@ -403,7 +406,7 @@ static int uart_probe(void)
 				drvdata->port_ptr + UART_MCR);
 			iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
 					drvdata->port_ptr + UART_FCR);
-			pr_debug("%s: loopback=%d\n", __func__, loopback);
+			pr_debug("loopback=%d\n", loopback);
 			if (loopback)
 				iowrite8(ioread8(drvdata->port_ptr + UART_MCR) | UART_MCR_LOOP,
 						drvdata->port_ptr + UART_MCR);
@@ -445,7 +448,7 @@ static void ldt_cleanup(void)
 		free_pages_exact(drvdata->out_buf, bufsize);
 	}
 
-	pr_debug("%s: isr_counter=%d\n", __func__, isr_counter);
+	pr_debug("isr_counter=%d\n", isr_counter);
 	if (drvdata->port_ptr)
 		ioport_unmap(drvdata->port_ptr);
 	if (port_r)
@@ -512,18 +515,18 @@ static __devinit int ldt_init(void)
 	debugfs = debugfs_create_file(KBUILD_MODNAME, S_IRUGO, NULL, NULL, &ldt_fops);
 	if (IS_ERR(debugfs)) {
 		ret = PTR_ERR(debugfs);
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "debugfs_create_file failed");
+		pr_err("debugfs_create_file failed\n");
 		goto exit;
 	}
 	ret = misc_register(&ldt_miscdev);
 	if (ret < 0) {
-		pr_err("%s:%d %s %s\n", __FILE__, __LINE__, __func__, "misc_register failed");
+		pr_err("misc_register failed\n");
 		goto exit;
 	}
-	pr_debug("%s: ldt_miscdev.minor=%d\n", __func__, ldt_miscdev.minor);
+	pr_debug("ldt_miscdev.minor=%d\n", ldt_miscdev.minor);
 
 exit:
-	pr_debug("%s: ret=%d\n", __func__, ret);
+	pr_debug("ret=%d\n", ret);
 	if (ret < 0)
 		ldt_cleanup();
 	return ret;
