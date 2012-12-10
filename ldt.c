@@ -366,11 +366,13 @@ static int uart_probe(void)
 	int ret = 0;
 
 	if (port) {
+		/*
 		port_r = request_region(port, port_size, KBUILD_MODNAME);
 		if (!port_r) {
 			pr_err("%s\n", "request_region failed");
-			//return -EBUSY;
+			return -EBUSY;
 		}
+		*/
 		drvdata->port_ptr = ioport_map(port, port_size);
 		pr_debug("drvdata->port_ptr=%p\n", drvdata->port_ptr);
 		if (!drvdata->port_ptr) {
