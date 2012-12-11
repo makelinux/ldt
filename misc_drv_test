@@ -1,25 +1,23 @@
 #!/bin/bash
 
+# The script is intended to be run from user root
+
 RED="\\033[0;31m"
 NOCOLOR="\\033[0;39m"
 GREEN="\\033[0;32m"
 GRAY="\\033[0;37m"
 
+dmesg -c > /dev/null # clear log buffer
 # It's supposed you computer doesn't use floppy device.
 # misc_drv uses IRQ 6 of floppy device demonstrate IRQ usage.
-sudo dmesg -c > /dev/null
-
-# The script is intend to be run from unprivileged user.
-# It usese sudo to run privileged operations
-sudo rmmod floppy 2> /dev/null
-sudo rmmod misc_drv 2> /dev/null
-sudo insmod  ./misc_drv.ko
-sudo chmod go+rw /dev/misc_drv
+rmmod floppy 2> /dev/null
+rmmod misc_drv 2> /dev/null
+insmod  ./misc_drv.ko
 
 data=123rw
 cat /dev/misc_drv > R.tmp &
 sleep 0.1; echo $data > /dev/misc_drv;
-sleep 0.1
+sleep 0.5
 kill %1; wait %1 2> /dev/null || true
 received=`cat R.tmp`
 rm -f R.tmp
@@ -31,7 +29,6 @@ echo -e "${RED}misc_drv blocking read/write test failed$NOCOLOR"
 echo expected $data
 echo received $received
 fi
-
 
 data=123nb
 echo -n $data > /dev/misc_drv
@@ -45,6 +42,6 @@ echo expected $data
 echo received $received
 fi
 
-sudo rmmod misc_drv.ko
-sudo dmesg --notime --show-delta --read-clear 2>/dev/null > kernel.log || \
-sudo dmesg -c > kernel.log && echo kernel.log saved
+rmmod misc_drv.ko
+dmesg --notime --show-delta --read-clear 2>/dev/null > kernel.log || \
+dmesg -c > kernel.log && echo kernel.log saved

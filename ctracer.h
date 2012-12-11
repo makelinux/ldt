@@ -39,7 +39,7 @@ extern __thread int ret;
 #define do_statement(a)	do { a } while (0)
 
 /*
-	trace variables: integer, hex, string, pointer, float, time value, with and w/o new line
+	trace variables: integer, hex, string, pointer, float, time value
 	macro with '_' doesn't prints new line
 	notation:
 	tr = trace

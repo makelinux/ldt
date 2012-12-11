@@ -18,9 +18,8 @@
  *	kfifo
  *	interrupt
  *	tasklet
- *	driven by IRQ 6
  *
- *	Run test script misc-drv-test to test the driver
+ *	Run test script misc_drv_test to test the driver
  *
  */
 
@@ -43,6 +42,11 @@
 #undef pr_fmt
 #define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
 
+/*
+ * It's supposed you computer doesn't use floppy device.
+ * We use IRQ and port of floppy device for demonstration.
+*/
+
 static int port = 0x3f4;
 module_param(port, int, 0);
 MODULE_PARM_DESC(port, "io port number, default 0x3f4 - floppy");
@@ -55,15 +59,24 @@ static int irq = 6;
 module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "interrupt request number, default 6 - floppy");
 
-
-#define FIFO_SIZE 128		/* must be power of two */
+/*
+ * Offsets of registers in port_emulation
+ *
+ * Pay attention that MISC_DRV_TX = MISC_DRV_RX and MISC_DRV_TX_FULL = MISC_DRV_RX_READY.
+ * It emulates loopback device. Transmitted data becomes received.
+ */
 
 #define MISC_DRV_TX	0
 #define MISC_DRV_RX	0
 #define MISC_DRV_TX_FULL	1
 #define MISC_DRV_RX_READY	1
 
+/**
+ * port_emulation[]  - array to emulate port I/0
+ */
+
 static char port_emulation[2];
+
 
 /**
  * struct misc_drv_data - the driver data
@@ -77,6 +90,8 @@ static char port_emulation[2];
  * Can be retrieved from platform_device with
  * struct misc_drv_data *drvdata = platform_get_drvdata(pdev);
  */
+
+#define FIFO_SIZE 128		/* must be power of two */
 
 struct misc_drv_data {
 	struct mutex read_lock;
@@ -95,15 +110,15 @@ static struct misc_drv_data *drvdata;
 static void misc_drv_tasklet_func(unsigned long d)
 {
 	char data_out, data_in;
-	struct misc_drv_data *drvdata = (void*) d;
+	struct misc_drv_data *drvdata = (void *)d;
 
-	while (	!ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL)
+	while (!ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL)
 			&& kfifo_out_spinlocked(&drvdata->out_fifo,
 				&data_out, sizeof(data_out), &drvdata->fifo_lock)) {
 		wake_up_interruptible(&drvdata->writeable);
 		pr_debug("data_out=%d %c\n", data_out, data_out >= 32 ? data_out : ' ');
 		iowrite8(data_out, drvdata->port_ptr + MISC_DRV_TX);
-		/* set full flag and implicitly ready flag */
+		/* set full tx flag and implicitly rx ready flag */
 		iowrite8(1, drvdata->port_ptr + MISC_DRV_TX_FULL);
 		/*
 		   In regular drivers hardware invokes interrupts.
@@ -119,14 +134,14 @@ static void misc_drv_tasklet_func(unsigned long d)
 		kfifo_in_spinlocked(&drvdata->in_fifo, &data_in,
 			sizeof(data_in), &drvdata->fifo_lock);
 		wake_up_interruptible(&drvdata->readable);
-		/* clear ready flag and implicitly full flag */
+		/* clear rx ready flag and implicitly tx full flag */
 		iowrite8(0, drvdata->port_ptr + MISC_DRV_RX_READY);
 	}
 }
 
 static irqreturn_t misc_drv_isr(int irq, void *d)
 {
-	struct misc_drv_data *drvdata = (void*) d;
+	struct misc_drv_data *drvdata = (void *)d;
 
 	tasklet_schedule(&drvdata->misc_drv_tasklet);
 	return IRQ_HANDLED;
@@ -238,25 +253,25 @@ static struct miscdevice misc_drv_dev = {
 };
 
 /*
- *	main initialization and cleanup section
+ * Initialization and cleanup section
  */
 
 static void misc_drv_cleanup(void)
 {
 	if (misc_drv_dev.this_device)
 		misc_deregister(&misc_drv_dev);
-	if (irq) {
+	if (irq)
 		free_irq(irq, drvdata);
-	}
 	tasklet_kill(&drvdata->misc_drv_tasklet);
 
-	if (drvdata->port_ptr) ioport_unmap(drvdata->port_ptr);
+	if (drvdata->port_ptr)
+		ioport_unmap(drvdata->port_ptr);
 	if (drvdata->port_res)
 		release_region(port, port_size);
 	kfree(drvdata);
 }
 
-static struct misc_drv_data * misc_drv_data_init(void)
+static struct misc_drv_data *misc_drv_data_init(void)
 {
 	struct misc_drv_data *drvdata;
 
@@ -272,7 +287,6 @@ static struct misc_drv_data * misc_drv_data_init(void)
 	tasklet_init(&drvdata->misc_drv_tasklet, misc_drv_tasklet_func, (unsigned long)drvdata);
 	return drvdata;
 }
-
 
 static __devinit int misc_drv_init(void)
 {
@@ -293,9 +307,9 @@ static __devinit int misc_drv_init(void)
 		return -EBUSY;
 	}
 	/*
-	   Real port can mappled with function with ioport_map:
+	   Real I/O port should be mapped with function with ioport_map:
 	   drvdata->port_ptr = ioport_map(port, port_size);
-	   But, because we use emulation mode, we use array instead mapped ports
+	   But, because we work in emulation mode, we use array instead mapped ports
 	*/
 	drvdata->port_ptr = (void __iomem *) port_emulation;
 	if (!drvdata->port_ptr) {

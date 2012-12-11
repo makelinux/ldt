@@ -30,8 +30,10 @@ dio: CPPFLAGS+= -DCTRACER_ON -include ctracer.h -g
 #dio: CPPFLAGS+= -D VERBOSE
 
 #_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c ctracer.h tracing.h
-_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c
+_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c misc_drv.c
 
 checkpatch:
-	#/usr/src/linux-headers-$(shell uname -r)/scripts/checkpatch.pl --no-tree --show-types --ignore LONG_LINE,LINE_CONTINUATIONS --terse -f $(_src) Makefile
-	/home/const/main/mix-prj/linux-all/linux.git/scripts/checkpatch.pl --no-tree --show-types --ignore LINE_CONTINUATIONS --terse -f $(_src) Makefile
+	checkpatch.pl --no-tree --show-types --ignore LINE_CONTINUATIONS --terse -f $(_src) Makefile
+
+checkpatch2:
+	checkpatch.pl --no-tree --show-types --ignore LONG_LINE,LINE_CONTINUATIONS --terse -f $(_src) Makefile

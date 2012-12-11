@@ -27,12 +27,14 @@ static __devinit int ldt_plat_probe(struct platform_device *pdev)
 {
 	char *data = NULL;
 	struct resource *r;
+	struct device *dev = &pdev->dev;
+
 _entry:
-	dev_dbg(&pdev->dev, "%s\n", __func__);
-		data = pdev->dev.platform_data;
+	dev_dbg(dev, "probe\n");
+	data = pdev->dev.platform_data;
 	irq = platform_get_irq(pdev, 0);
 	r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	pr_debug("%s: pdev->dev.of_node = %p\n", __func__, pdev->dev.of_node);
+	pr_debug("pdev->dev.of_node = %p\n", pdev->dev.of_node);
 #ifdef CONFIG_OF_DEVICE
 	if (pdev->dev.of_node) {
 		const __be32 *p;
@@ -55,6 +57,13 @@ _entry:
 	r = platform_get_resource(pdev, IORESOURCE_IO, 0);
 	port = r->start;
 	port_size = resource_size(r);
+	/*
+	   devm_kzalloc
+
+	   res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	   r = devm_request_and_ioremap(&pdev->dev, res);
+
+	   */
 
 	return 0;
 }
