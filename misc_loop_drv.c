@@ -1,5 +1,5 @@
 /*
- *	misc-drv
+ *	misc_loop_drv
  *
  *	Simple misc device driver sample
  *
@@ -19,7 +19,7 @@
  *	interrupt
  *	tasklet
  *
- *	Run test script misc_drv_test to test the driver
+ *	Run test script misc_loop_drv_test to test the driver
  *
  */
 
@@ -79,7 +79,7 @@ static char port_emulation[2];
 
 
 /**
- * struct misc_drv_data - the driver data
+ * struct misc_loop_drv_data - the driver data
  * @in_fifo:	input queue for write
  * @out_fifo:	output queue for read
  * @fifo_lock:	lock for queues
@@ -88,29 +88,29 @@ static char port_emulation[2];
  * @port_ptr:	mapped io port
  *
  * Can be retrieved from platform_device with
- * struct misc_drv_data *drvdata = platform_get_drvdata(pdev);
+ * struct misc_loop_drv_data *drvdata = platform_get_drvdata(pdev);
  */
 
 #define FIFO_SIZE 128		/* must be power of two */
 
-struct misc_drv_data {
+struct misc_loop_drv_data {
 	struct mutex read_lock;
 	struct mutex write_lock;
 	DECLARE_KFIFO(in_fifo, char, FIFO_SIZE);
 	DECLARE_KFIFO(out_fifo, char, FIFO_SIZE);
 	spinlock_t fifo_lock;
 	wait_queue_head_t readable, writeable;
-	struct tasklet_struct misc_drv_tasklet;
+	struct tasklet_struct misc_loop_drv_tasklet;
 	void __iomem *port_ptr;
 	struct resource *port_res;
 };
 
-static struct misc_drv_data *drvdata;
+static struct misc_loop_drv_data *drvdata;
 
-static void misc_drv_tasklet_func(unsigned long d)
+static void misc_loop_drv_tasklet_func(unsigned long d)
 {
 	char data_out, data_in;
-	struct misc_drv_data *drvdata = (void *)d;
+	struct misc_loop_drv_data *drvdata = (void *)d;
 
 	while (!ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL)
 			&& kfifo_out_spinlocked(&drvdata->out_fifo,
@@ -139,15 +139,15 @@ static void misc_drv_tasklet_func(unsigned long d)
 	}
 }
 
-static irqreturn_t misc_drv_isr(int irq, void *d)
+static irqreturn_t misc_loop_drv_isr(int irq, void *d)
 {
-	struct misc_drv_data *drvdata = (void *)d;
+	struct misc_loop_drv_data *drvdata = (void *)d;
 
-	tasklet_schedule(&drvdata->misc_drv_tasklet);
+	tasklet_schedule(&drvdata->misc_loop_drv_tasklet);
 	return IRQ_HANDLED;
 }
 
-static int misc_drv_open(struct inode *inode, struct file *file)
+static int misc_loop_drv_open(struct inode *inode, struct file *file)
 {
 	pr_debug("from %s\n", current->comm);
 	/* client related data can be allocated here and
@@ -155,7 +155,7 @@ static int misc_drv_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int misc_drv_release(struct inode *inode, struct file *file)
+static int misc_loop_drv_release(struct inode *inode, struct file *file)
 {
 	pr_debug("from %s\n", current->comm);
 	/* client related data can be retrieved from file->private_data
@@ -163,7 +163,7 @@ static int misc_drv_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t misc_drv_read(struct file *file, char __user *buf,
+static ssize_t misc_loop_drv_read(struct file *file, char __user *buf,
 		size_t count, loff_t *ppos)
 {
 	int ret = 0;
@@ -191,7 +191,7 @@ static ssize_t misc_drv_read(struct file *file, char __user *buf,
 	return ret ? ret : copied;
 }
 
-static ssize_t misc_drv_write(struct file *file, const char __user *buf,
+static ssize_t misc_loop_drv_write(struct file *file, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
 	int ret;
@@ -214,12 +214,12 @@ static ssize_t misc_drv_write(struct file *file, const char __user *buf,
 		return -EINTR;
 	ret = kfifo_from_user(&drvdata->out_fifo, buf, count, &copied);
 	mutex_unlock(&drvdata->write_lock);
-	tasklet_schedule(&drvdata->misc_drv_tasklet);
+	tasklet_schedule(&drvdata->misc_loop_drv_tasklet);
 
 	return ret ? ret : copied;
 }
 
-static unsigned int misc_drv_poll(struct file *file, poll_table *pt)
+static unsigned int misc_loop_drv_poll(struct file *file, poll_table *pt)
 {
 	unsigned int mask = 0;
 	poll_wait(file, &drvdata->readable, pt);
@@ -237,32 +237,32 @@ static unsigned int misc_drv_poll(struct file *file, poll_table *pt)
 	return mask;
 }
 
-static const struct file_operations misc_drv_fops = {
+static const struct file_operations misc_loop_drv_fops = {
 	.owner	= THIS_MODULE,
-	.open	= misc_drv_open,
-	.release = misc_drv_release,
-	.read	= misc_drv_read,
-	.write	= misc_drv_write,
-	.poll	= misc_drv_poll,
+	.open	= misc_loop_drv_open,
+	.release = misc_loop_drv_release,
+	.read	= misc_loop_drv_read,
+	.write	= misc_loop_drv_write,
+	.poll	= misc_loop_drv_poll,
 };
 
-static struct miscdevice misc_drv_dev = {
+static struct miscdevice misc_loop_drv_dev = {
 	.minor	= MISC_DYNAMIC_MINOR,
 	.name	= KBUILD_MODNAME,
-	.fops	= &misc_drv_fops,
+	.fops	= &misc_loop_drv_fops,
 };
 
 /*
  * Initialization and cleanup section
  */
 
-static void misc_drv_cleanup(void)
+static void misc_loop_drv_cleanup(void)
 {
-	if (misc_drv_dev.this_device)
-		misc_deregister(&misc_drv_dev);
+	if (misc_loop_drv_dev.this_device)
+		misc_deregister(&misc_loop_drv_dev);
 	if (irq)
 		free_irq(irq, drvdata);
-	tasklet_kill(&drvdata->misc_drv_tasklet);
+	tasklet_kill(&drvdata->misc_loop_drv_tasklet);
 
 	if (drvdata->port_ptr)
 		ioport_unmap(drvdata->port_ptr);
@@ -271,9 +271,9 @@ static void misc_drv_cleanup(void)
 	kfree(drvdata);
 }
 
-static struct misc_drv_data *misc_drv_data_init(void)
+static struct misc_loop_drv_data *misc_loop_drv_data_init(void)
 {
-	struct misc_drv_data *drvdata;
+	struct misc_loop_drv_data *drvdata;
 
 	drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)
@@ -284,20 +284,20 @@ static struct misc_drv_data *misc_drv_data_init(void)
 	INIT_KFIFO(drvdata->out_fifo);
 	mutex_init(&drvdata->read_lock);
 	mutex_init(&drvdata->write_lock);
-	tasklet_init(&drvdata->misc_drv_tasklet, misc_drv_tasklet_func, (unsigned long)drvdata);
+	tasklet_init(&drvdata->misc_loop_drv_tasklet, misc_loop_drv_tasklet_func, (unsigned long)drvdata);
 	return drvdata;
 }
 
-static __devinit int misc_drv_init(void)
+static __devinit int misc_loop_drv_init(void)
 {
 	int ret = 0;
 
 	pr_debug("MODNAME=%s\n", KBUILD_MODNAME);
 	pr_debug("port = %X irq = %d\n", port, irq);
 
-	drvdata = misc_drv_data_init();
+	drvdata = misc_loop_drv_data_init();
 	if (!drvdata) {
-		pr_err("misc_drv_data_init failed\n");
+		pr_err("misc_loop_drv_data_init failed\n");
 		goto exit;
 	}
 
@@ -320,13 +320,13 @@ static __devinit int misc_drv_init(void)
 	iowrite8(0, drvdata->port_ptr + MISC_DRV_TX);
 	iowrite8(0, drvdata->port_ptr + MISC_DRV_TX_FULL);
 
-	ret = misc_register(&misc_drv_dev);
+	ret = misc_register(&misc_loop_drv_dev);
 	if (ret < 0) {
 		pr_err("misc_register failed\n");
 		goto exit;
 	}
-	pr_debug("misc_drv_dev.minor=%d\n", misc_drv_dev.minor);
-	ret = request_irq(irq, misc_drv_isr, 0, KBUILD_MODNAME, drvdata);
+	pr_debug("misc_loop_drv_dev.minor=%d\n", misc_loop_drv_dev.minor);
+	ret = request_irq(irq, misc_loop_drv_isr, 0, KBUILD_MODNAME, drvdata);
 	if (ret < 0) {
 		pr_err("request_irq failed\n");
 		return ret;
@@ -335,13 +335,13 @@ static __devinit int misc_drv_init(void)
 exit:
 	pr_debug("ret=%d\n", ret);
 	if (ret < 0)
-		misc_drv_cleanup();
+		misc_loop_drv_cleanup();
 	return ret;
 }
 
-module_init(misc_drv_init);
-module_exit(misc_drv_cleanup);
+module_init(misc_loop_drv_init);
+module_exit(misc_loop_drv_cleanup);
 
-MODULE_DESCRIPTION("misc-drv Simple misc device driver sample");
+MODULE_DESCRIPTION("misc_loop_drv Simple misc device driver sample");
 MODULE_AUTHOR("Constantine Shulyupin <const@makelinux.net>");
 MODULE_LICENSE("GPL");

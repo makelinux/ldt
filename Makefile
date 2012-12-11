@@ -11,7 +11,7 @@ obj-m+= ldt_plat_dev.o # implements platform_device and resource
 #obj-m+= chrdev_region_sample.o
 obj-m+= ldt_configfs_basic.o
 obj-m+= kthread_sample.o
-obj-m+= misc_drv.o
+obj-m+= misc_loop_drv.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
@@ -30,7 +30,7 @@ dio: CPPFLAGS+= -DCTRACER_ON -include ctracer.h -g
 #dio: CPPFLAGS+= -D VERBOSE
 
 #_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c ctracer.h tracing.h
-_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c misc_drv.c
+_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c misc_loop_drv.c
 
 checkpatch:
 	checkpatch.pl --no-tree --show-types --ignore LINE_CONTINUATIONS --terse -f $(_src) Makefile

@@ -8,7 +8,7 @@ module, platform driver, file operations (read/write, mmap, ioctl, blocking and 
 
 Just run
 
-git clone git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test && sudo ./misc_drv_test
+git clone git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test && sudo ./misc_loop_drv_test
 
 and explore sources.
 
@@ -22,7 +22,7 @@ Test script, run it: **[ldt-test](https://github.com/makelinux/ldt/blob/master/l
 Generic testing utility for Device I/O: **[dio.c](https://github.com/makelinux/ldt/blob/master/dio.c)**
 
 Simple misc driver with read, write, fifo, tasklet and IRQ:
-**[misc_drv.c](https://github.com/makelinux/ldt/blob/master/misc_drv.c)**
+**[misc_loop_drv.c](https://github.com/makelinux/ldt/blob/master/misc_loop_drv.c)**
 
 Browse the rest of source: https://github.com/makelinux/ldt/
 
