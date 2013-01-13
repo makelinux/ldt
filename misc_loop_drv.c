@@ -17,6 +17,7 @@
  *		polling
  *	kfifo
  *	interrupt
+ *	io
  *	tasklet
  *
  *	Run test script misc_loop_drv_test to test the driver
@@ -40,20 +41,20 @@
 #include <asm/apic.h>
 
 #undef pr_fmt
-#define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
+#define pr_fmt(fmt)  "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
 
 /*
  * It's supposed you computer doesn't use floppy device.
- * We use IRQ and port of floppy device for demonstration.
+ * This drivers uses IRQ and port of floppy device for demonstration.
 */
 
 static int port = 0x3f4;
 module_param(port, int, 0);
-MODULE_PARM_DESC(port, "io port number, default 0x3f4 - floppy");
+MODULE_PARM_DESC(port, "I/O port number, default 0x3f4 - floppy");
 
 static int port_size = 2;
 module_param(port_size, int, 0);
-MODULE_PARM_DESC(port_size, "number of io ports, default 2");
+MODULE_PARM_DESC(port_size, "size of I/O port mapping, default 2");
 
 static int irq = 6;
 module_param(irq, int, 0);
@@ -62,8 +63,8 @@ MODULE_PARM_DESC(irq, "interrupt request number, default 6 - floppy");
 /*
  * Offsets of registers in port_emulation
  *
- * Pay attention that MISC_DRV_TX = MISC_DRV_RX and MISC_DRV_TX_FULL = MISC_DRV_RX_READY.
- * It emulates loopback device. Transmitted data becomes received.
+ * Pay attention that MISC_DRV_TX == MISC_DRV_RX and MISC_DRV_TX_FULL == MISC_DRV_RX_READY.
+ * Transmitted data becomes received and emulates port in loopback mode.
  */
 
 #define MISC_DRV_TX	0
@@ -71,12 +72,9 @@ MODULE_PARM_DESC(irq, "interrupt request number, default 6 - floppy");
 #define MISC_DRV_TX_FULL	1
 #define MISC_DRV_RX_READY	1
 
-/**
- * port_emulation[]  - array to emulate port I/0
- */
+static char port_emulation[2]; /*  array to emulate I/0 port */
 
-static char port_emulation[2];
-
+#define FIFO_SIZE 128		/* must be power of two */
 
 /**
  * struct misc_loop_drv_data - the driver data
@@ -90,8 +88,6 @@ static char port_emulation[2];
  * Can be retrieved from platform_device with
  * struct misc_loop_drv_data *drvdata = platform_get_drvdata(pdev);
  */
-
-#define FIFO_SIZE 128		/* must be power of two */
 
 struct misc_loop_drv_data {
 	struct mutex read_lock;
@@ -114,7 +110,7 @@ static void misc_loop_drv_tasklet_func(unsigned long d)
 
 	while (!ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL)
 			&& kfifo_out_spinlocked(&drvdata->out_fifo,
-				&data_out, sizeof(data_out), &drvdata->fifo_lock)) {
+			&data_out, sizeof(data_out), &drvdata->fifo_lock)) {
 		wake_up_interruptible(&drvdata->writeable);
 		pr_debug("data_out=%d %c\n", data_out, data_out >= 32 ? data_out : ' ');
 		iowrite8(data_out, drvdata->port_ptr + MISC_DRV_TX);
@@ -128,7 +124,7 @@ static void misc_loop_drv_tasklet_func(unsigned long d)
 		 */
 		apic->send_IPI_all(IRQ0_VECTOR+irq);
 	}
-	while (ioread8(drvdata->port_ptr + MISC_DRV_RX_READY)) {
+	while ( ioread8(drvdata->port_ptr + MISC_DRV_RX_READY)) {
 		data_in = ioread8(drvdata->port_ptr + MISC_DRV_RX);
 		pr_debug("data_in=%d %c\n", data_in, data_in >= 32 ? data_in : ' ');
 		kfifo_in_spinlocked(&drvdata->in_fifo, &data_in,
@@ -284,7 +280,8 @@ static struct misc_loop_drv_data *misc_loop_drv_data_init(void)
 	INIT_KFIFO(drvdata->out_fifo);
 	mutex_init(&drvdata->read_lock);
 	mutex_init(&drvdata->write_lock);
-	tasklet_init(&drvdata->misc_loop_drv_tasklet, misc_loop_drv_tasklet_func, (unsigned long)drvdata);
+	tasklet_init(&drvdata->misc_loop_drv_tasklet,
+			misc_loop_drv_tasklet_func, (unsigned long)drvdata);
 	return drvdata;
 }
 

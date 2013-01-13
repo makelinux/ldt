@@ -5,7 +5,6 @@
 RED="\\033[0;31m"
 NOCOLOR="\\033[0;39m"
 GREEN="\\033[0;32m"
-GRAY="\\033[0;37m"
 
 dmesg -c > /dev/null # clear log buffer
 # It's supposed you computer doesn't use floppy device.

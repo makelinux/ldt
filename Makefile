@@ -5,13 +5,13 @@ ccflags-y+=-fmax-errors=5
 #ccflags-y+=-DCTRACER_ON -include $M/ctracer.h
 #ccflags-y+=-D USE_MISCDEV # uncomment to use single misc device instead char devices region
 
+obj-m+= misc_loop_drv.o
 obj-m+= ldt.o
 obj-m+= ldt_plat_drv.o # implements platform_driver only
 obj-m+= ldt_plat_dev.o # implements platform_device and resource
 #obj-m+= chrdev_region_sample.o
 obj-m+= ldt_configfs_basic.o
 obj-m+= kthread_sample.o
-obj-m+= misc_loop_drv.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 

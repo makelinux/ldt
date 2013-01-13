@@ -13,7 +13,6 @@
 RED="\\033[0;31m"
 NOCOLOR="\\033[0;39m"
 GREEN="\\033[0;32m"
-GRAY="\\033[0;37m"
 
 set -o errtrace
 debugfs=`grep debugfs /proc/mounts | awk '{ print $2; }'`
