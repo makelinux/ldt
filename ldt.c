@@ -47,6 +47,8 @@
 #include <linux/debugfs.h>
 #include <linux/cdev.h>
 
+#include "common.h"
+
 #undef pr_fmt
 #define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
 

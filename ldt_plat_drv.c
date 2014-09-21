@@ -17,6 +17,8 @@
 #include <linux/of_platform.h>
 #include <linux/mod_devicetable.h>
 #include <linux/of_irq.h>
+
+#include "common.h"
 #include "tracing.h"
 
 static int irq;
