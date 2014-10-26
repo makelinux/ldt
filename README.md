@@ -29,6 +29,10 @@ Browse the rest of source: https://github.com/makelinux/ldt/
 
 ## Compiled and tested on Linux versions:
 
+v3.18-rc1
+
+3.13.0-37-generic (Ubuntu 14.04.1 LTS)
+
 v3.6-rc5
 
 3.2.0-30-generic-pae (Ubuntu 12.04 LTS)
