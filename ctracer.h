@@ -290,14 +290,9 @@ static inline unsigned int _hweight32(unsigned int w)
 #else /* !CTRACER_ON */
 #define trllog(args ...)
 
-static inline int empty_function(void)
-{
-	return 0;
-}
-
 #define IFTRACE(x) empty_statement()
 #define trace_linux_mem() empty_statement()
-#define tracef(fmt, args...) empty_function()
+#define tracef(fmt, args...)
 #define stack_trace() empty_statement()
 
 #endif /* _TARCE */
