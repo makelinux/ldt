@@ -1,8 +1,11 @@
 #ifndef __LDT_COMMON_H__
 #define __LDT_COMMON_H__
 
-/* With Linux 3.8 the __devinit macro and others were removed from <linux/init.h>
-   Defining them as empty here to keep the other code portable to older kernel versions. */
+/* With Linux 3.8 the __devinit macro and others were removed from
+ * <linux/init.h>
+ * Defining them as empty here to keep the other code portable to older kernel
+ * versions.
+ */
 
 #include <linux/init.h>
 
