@@ -243,7 +243,10 @@ int options_init()
  * from string to numeric values using predefined preprocessor defines
  */
 
-#define return_if_arg_is_equal(entry) do { if (0 == strcmp(arg, #entry)) return entry; } while (0)
+#define return_if_arg_is_equal(entry) do {	\
+		if (0 == strcmp(arg, #entry))	\
+			return entry;		\
+	} while (0)
 
 int expand_arg(char *arg)
 {
