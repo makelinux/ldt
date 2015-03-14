@@ -1,12 +1,12 @@
 /*
-	Tracing utility for C
-
-	implemented in single h-file
-
-	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
-
-	Dual BSD/GPL License
-*/
+ * Tracing utility for C
+ *
+ * implemented in single h-file
+ *
+ * Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
+ *
+ * Dual BSD/GPL License
+ */
 
 #if 0
 /* Optional configuration flags: */
@@ -46,7 +46,8 @@ extern __thread int ret;
 	v<letter> = printf Variable in specified format (d, x, f, s, etc)
 */
 
-#define trla(fmt, args...) tracef("%s:%i %s "fmt, __file__, __LINE__, __func__, ## args)
+#define trla(fmt, args...) \
+	tracef("%s:%i %s "fmt, __file__, __LINE__, __func__, ## args)
 #define trv(t, v) tracef(#v" = %"t EOL, v)
 #define trv_(t, v) tracef(#v" = %"t" ", v)
 #define trvd(d) tracef(#d" = %ld"EOL, (long int)d)
@@ -57,20 +58,43 @@ extern __thread int ret;
 #define trvX(x) tracef(#x" = %#X"EOL, (int)x)
 #define trvf(f) tracef(#f" = %f"EOL, f)
 #define trvf_(f) tracef(#f" = %f ", f)
-#define trvtv_(tv) tracef(#tv" = %u.%06u ", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
-#define trvtv(tv) tracef(#tv" = %u.%06u"EOL, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
+#define trvtv_(tv) tracef(#tv" = %u.%06u ", \
+			  (unsigned int)tv.tv_sec, \
+			  (unsigned int)tv.tv_usec)
+#define trvtv(tv) tracef(#tv" = %u.%06u"EOL, \
+			 (unsigned int)tv.tv_sec, \
+			 (unsigned int)tv.tv_usec)
 #define trvs(s) tracef(#s" = \"%s\""EOL, s)
 #define trvs_(s) tracef(#s" = \"%s\" ", s)
 #define trvp(p) tracef(#p" = %08x"EOL, (unsigned)p)
 #define trvp_(p) tracef(#p" = %08x ", (unsigned)p)
-#define trvdn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%d:%d,", i, (*((int *)d+i))); tracef(EOL); }
-#define trvxn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%04x,", (*((int *)d+i))); tracef(EOL); }
+#define trvdn(d, n)						\
+	{							\
+		int i;						\
+		tracef("%s", #d"[]=");				\
+		for (i = 0; i < n; i++)				\
+			tracef("%d:%d,", i, (*((int *)d+i)));	\
+		tracef(EOL);					\
+	}
+#define trvxn(d, n)						\
+	{							\
+		int i;						\
+		tracef("%s", #d"[]=");				\
+		for (i = 0; i < n; i++)				\
+			tracef("%04x,", (*((int *)d+i)));	\
+		tracef(EOL);					\
+	}
 #define trvdr(record) trvdn(&record, sizeof(record)/sizeof(int));
 #define trvxr(record) trvxn(&record, sizeof(record)/sizeof(int));
 
 /* trvdnz - TRace Digital Variable, if Not Zero */
 #define trvdnz(d) { if (d) tracef(#d" = %d"EOL, (int)d); }
-#define trace_call(a) do { trla("calling %s {\n", #a); a; tracef("} done\n"); } while (0)
+#define trace_call(a)			    \
+	do {				    \
+		trla("calling %s {\n", #a); \
+		a;			    \
+		tracef("} done\n");	    \
+	} while (0)
 
 /* trlm - TRace Location, with Message */
 #define trlm(m) tracef(SOL"%s:%i %s %s"EOL, __file__, __LINE__, __func__, m)
@@ -83,59 +107,94 @@ extern __thread int ret;
 #define trl_out() do_statement(trace_time(); trlm("}");)
 #define empty_statement() do { } while (0)
 
-#define trace_mem(P, N) \
-	 IFTRACE({ int i = 0; tracef("%s=", #P); for (; i < (int)(N) ; i++) \
-{ if (i && (!(i % 16))) tracef("%i:", i); \
-tracef("%02x ", 0xFF & *((char *)((void *)(P))+i)); \
-if (!((i+1) % 4)) \
-	tracef(" "); \
-if (!((i+1) % 16)) \
-	tracef(EOL); \
-}; tracef(EOL); })
+#define trace_mem(P, N)							    \
+	IFTRACE({							    \
+		int i = 0;						    \
+		tracef("%s=", #P);					    \
+		for (; i < (int)(N) ; i++) {				    \
+			if (i && (!(i % 16)))				    \
+				tracef("%i:", i);			    \
+			tracef("%02x ", 0xFF & *((char *)((void *)(P))+i)); \
+			if (!((i+1) % 4))				    \
+				tracef(" ");				    \
+			if (!((i+1) % 16))				    \
+				tracef(EOL);				    \
+		};							    \
+		tracef(EOL);						    \
+	})
 
-#define trace_mem_int_list(P, N) \
-IFTRACE({ int i = 0; for (; i < (int)(N); i += sizeof(int)) \
-{ tracef("%i, ", *(int *)((void *)(P)+i)); \
-}; })
+#define trace_mem_int_list(P, N)					    \
+	IFTRACE({							    \
+			int i = 0;					    \
+			for (; i < (int)(N); i += sizeof(int))		    \
+			{						    \
+				tracef("%i, ", *(int *)((void *)(P)+i));    \
+			};						    \
+		})
 
-#define trace_mem_int(P, N) \
-IFTRACE({ int i = 0; for (; i < (int)(N) ; i += sizeof(int)) \
-{ if (i && (!(i % 16))) tracef("%i:", i); \
-tracef("%x ", *(int *)((void *)(P)+i)); \
-if (!((i+1) % 64)) \
-	tracef(EOL); \
-}; tracef(EOL); })
+#define trace_mem_int(P, N)						    \
+	IFTRACE({							    \
+			int i = 0;					    \
+			for (; i < (int)(N) ; i += sizeof(int)) {	    \
+				if (i && (!(i % 16)))			    \
+					tracef("%i:", i);		    \
+				tracef("%x ", *(int *)((void *)(P)+i));	    \
+				if (!((i+1) % 64))			    \
+					tracef(EOL);			    \
+			};						    \
+			tracef(EOL);					    \
+		})
 
-#define trace_ioctl(nr) tracef("ioctl=(%c%c %c #%i %i)\n", \
-	(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', (_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
-	_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
+#define trace_ioctl(nr)					    \
+	tracef("ioctl=(%c%c %c #%i %i)\n",		    \
+		(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ',	    \
+		(_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ',    \
+		_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
 
-#define trace_ioctl_(nr) tracef("ioctl=(%i %i %i %i)", _IOC_DIR(nr), _IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
+#define trace_ioctl_(nr)		\
+	tracef("ioctl=(%i %i %i %i)",	\
+		_IOC_DIR(nr),		\
+		_IOC_TYPE(nr),		\
+		_IOC_NR(nr),		\
+		_IOC_SIZE(nr))
 
-#define chkz(a) \
-(p = a,\
-	((!p) ? tracef("%s %i %s FAIL %i = %s\n", __FILE__, __LINE__, __func__, p, #a) : 0),\
+#define chkz(a)							    \
+	(p = a,							    \
+	((!p) ? tracef("%s %i %s FAIL %i = %s\n",		    \
+			__FILE__, __LINE__, __func__, p, #a) : 0),  \
 	p)
 
-#define chkn(a) \
-(ret = a,\
-	((ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n", __FILE__, __LINE__, __func__, ret, #a)\
-	 : 0), ret)
+#define chkn(a)							    \
+	(ret = a,						    \
+	 ((ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n",	    \
+			     __FILE__, __LINE__, __func__, ret, #a) \
+		    : 0),					    \
+	 ret)
 
-#define chkne(a) \
-(/* tracef("calling  %s\n",#a), */ \
-	ret = a,\
-	((ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n", __FILE__, __LINE__, __func__, errno, strerror(errno), ret, #a)\
-	 : 0), ret)
+#define chkne(a)							    \
+	(/* tracef("calling  %s\n",#a), */				    \
+	ret = a,							    \
+	((ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n",    \
+			    __FILE__, __LINE__, __func__, errno,	    \
+			    strerror(errno), ret, #a)			    \
+		   : 0),						    \
+	 ret)
 
-#define chkn2(a) \
-(ret = a,\
-	((ret < 0) ? tracef("%s %i %s FAIL %i = %s\n", __FILE__, __LINE__, __func__, ret, #a)\
-	 : tracef("%s %i %s %i = %s\n", __FILE__, __LINE__, __func__, ret, #a)),\
+#define chkn2(a)							    \
+	(ret = a,							    \
+	((ret < 0) ? tracef("%s %i %s FAIL %i = %s\n", __FILE__, __LINE__,  \
+			    __func__, ret, #a)				    \
+		   : tracef("%s %i %s %i = %s\n", __FILE__, __LINE__,	    \
+			    __func__, ret, #a)),			    \
 	ret)
 
-#define once(exp) do_statement( \
-	static int _passed; if (!_passed) {exp; }; _passed = 1;)
+#define once(exp) do_statement(	    \
+		static int _passed; \
+		if (!_passed) {	    \
+			exp;	    \
+		};		    \
+		_passed = 1;	    \
+	)
 
 
 #ifdef CTRACER_OFF		/* force no tracing */
@@ -154,13 +213,17 @@ if (!((i+1) % 64)) \
 #include <linux/mmzone.h>
 
 extern int free_pages_prev;
-#define trace_linux_mem() do { \
-extern zone_t *zone_table[MAX_NR_ZONES*MAX_NR_NODES]; \
-int mem_change = zone_table[0]->free_pages - free_pages_prev; \
-if (mem_change) { \
-	trl_(); trvi_(mem_change); trvi(zone_table[0]->free_pages); } \
-	free_pages_prev = zone_table[0]->free_pages; \
-} while (0)
+#define trace_linux_mem()						    \
+	do {								    \
+		extern zone_t *zone_table[MAX_NR_ZONES*MAX_NR_NODES];	    \
+		int mem_change = zone_table[0]->free_pages - free_pages_prev;\
+		if (mem_change) {					    \
+			trl_();				    		    \
+			trvi_(mem_change);		    		    \
+			trvi(zone_table[0]->free_pages);    		    \
+		}					    		    \
+		free_pages_prev = zone_table[0]->free_pages;		    \
+	} while (0)
 #endif
 
 #define SOL KERN_DEBUG
@@ -194,35 +257,35 @@ static inline unsigned int _hweight32(unsigned int w)
 
 #define _hweight32 _hweight32
 #endif
-#define trllog(args ...) \
-do {  \
-	static int num;			\
-	if (_hweight32(num) < 2) {		\
-		trla("#%d\n", (int)num);	\
-	}	num++;				\
-} while (0)
+#define trllog(args ...)				\
+	do {						\
+		static int num;				\
+		if (_hweight32(num) < 2) {		\
+			trla("#%d\n", (int)num);	\
+		}	num++;				\
+	} while (0)
 
-#define trlnum(n, args ...) \
-do {  \
-	static int num;			\
-	if (num < n) {		\
-		trl_();				\
-		tracef("#0x%x", (int)num);	\
-		args;				\
-		trln();			\
-	}	num++;				\
-} while (0)
+#define trlnum(n, args ...)					\
+	do {							\
+		static int num;					\
+		if (num < n) {					\
+			trl_();					\
+			tracef("#0x%x", (int)num);		\
+			args;					\
+			trln();					\
+		}	num++;					\
+	} while (0)
 
-#define trleach(n, args ...) \
-do {  \
-	static int num;			\
-	if (!(num % n)) {	\
-		trl_();				\
-		trvi_(num);		\
-		args;				\
-		trln();			\
-	}	num++;				\
-} while (0)
+#define trleach(n, args ...)			\
+	do {					\
+		static int num;			\
+		if (!(num % n)) {		\
+			trl_();			\
+			trvi_(num);		\
+			args;			\
+			trln();			\
+		}	num++;			\
+	} while (0)
 
 #else /* !CTRACER_ON */
 #define trllog(args ...)
@@ -259,14 +322,22 @@ static void *malloc_trace;
 #endif
 #ifdef TRACE_MALLOC
 
-#define malloc(s) \
-	(trla("malloc #%i %p %i\n", ++malloc_count, malloc_trace = malloc(s), s),\
+#define malloc(s)			    \
+	(trla("malloc #%i %p %i\n",	    \
+	      ++malloc_count,		    \
+	      malloc_trace = malloc(s), s), \
 	malloc_trace)
 
-#define free(p) { free(p); trla("free   #%i %p\n", malloc_count--, (void *)p); }
+#define free(p)								\
+	{								\
+		free(p);						\
+		trla("free   #%i %p\n", malloc_count--, (void *)p);	\
+	}
 
-#define strdup(s) \
-	(trla("strdup #%i %p\n", ++malloc_count, malloc_trace = (void *)strdup(s)),\
+#define strdup(s)					\
+	(trla("strdup #%i %p\n",			\
+	      ++malloc_count,				\
+	      malloc_trace = (void *)strdup(s)),	\
 	(char *)malloc_trace)
 
 #endif
@@ -343,11 +414,18 @@ static inline void stack_trace(void)
 #endif /* __GLIBC__ */
 
 /* see also nr_free_pages */
-#define freeram() { \
-	static unsigned int last; struct sysinfo i; si_meminfo(&i); trl_(); \
-	int d = last-i.freeram; int used = i.totalram-i.freeram; \
-	trvi_(i.freeram); trvi_(used);  trvi(d); \
-	last = i.freeram; }
+#define freeram() {					\
+		static unsigned int last;	    	\
+		struct sysinfo i;		    	\
+		si_meminfo(&i);			    	\
+		trl_();				    	\
+		int d = last-i.freeram;		    	\
+		int used = i.totalram-i.freeram;    	\
+		trvi_(i.freeram);			\
+		trvi_(used);				\
+		trvi(d);				\
+		last = i.freeram;			\
+	}
 
 extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
 
@@ -369,12 +447,17 @@ static inline int lookup_symbol_name(unsigned long addr, char *symbol)
 int lookup_symbol_name(unsigned long addr, char *symname);
 #endif
 
-#define _trace_enter_exit_() char _caller[200]; \
-	lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller); \
-	char __attribute__((cleanup(__on_cleanup))) *_s; \
-	char _ret_msg[100]; _s = _ret_msg; \
-	snprintf(_ret_msg, sizeof(_ret_msg), "%s < %s }\n", _caller, __func__); \
-	tracef(SOL"%s > %s { @ %s:%d", _caller, __func__, __file__, __LINE__);
+#define _trace_enter_exit_()						\
+	char _caller[200];						\
+	lookup_symbol_name((unsigned long)__builtin_return_address(0),	\
+			   _caller);					\
+	char __attribute__((cleanup(__on_cleanup))) *_s;		\
+	char _ret_msg[100];						\
+	_s = _ret_msg;							\
+	snprintf(_ret_msg, sizeof(_ret_msg),				\
+		 "%s < %s }\n", _caller, __func__);			\
+	tracef(SOL"%s > %s { @ %s:%d",					\
+		_caller, __func__, __file__, __LINE__);
 
 /*__END_DECLS */
 #endif /* CTRACER_H_INCLUDED */
