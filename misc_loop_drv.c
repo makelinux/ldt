@@ -65,7 +65,8 @@ MODULE_PARM_DESC(irq, "interrupt request number, default 6 - floppy");
 /*
  * Offsets of registers in port_emulation
  *
- * Pay attention that MISC_DRV_TX == MISC_DRV_RX and MISC_DRV_TX_FULL == MISC_DRV_RX_READY.
+ * Pay attention that MISC_DRV_TX == MISC_DRV_RX and
+ * MISC_DRV_TX_FULL == MISC_DRV_RX_READY.
  * Transmitted data becomes received and emulates port in loopback mode.
  */
 
@@ -306,10 +307,11 @@ static __devinit int misc_loop_drv_init(void)
 		return -EBUSY;
 	}
 	/*
-	   Real I/O port should be mapped with function with ioport_map:
-	   drvdata->port_ptr = ioport_map(port, port_size);
-	   But, because we work in emulation mode, we use array instead mapped ports
-	*/
+	 * Real I/O port should be mapped with function with ioport_map:
+	 * drvdata->port_ptr = ioport_map(port, port_size);
+	 * But, because we work in emulation mode, we use array instead mapped
+	 * ports
+	 */
 	drvdata->port_ptr = (void __iomem *) port_emulation;
 	if (!drvdata->port_ptr) {
 		pr_err("ioport_map failed\n");
