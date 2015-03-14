@@ -25,7 +25,7 @@
 #define CTRACER_H_INCLUDED
 extern __thread int ret;
 
-#define multistatement(ms) ms /* trick to bypass checkpatch.pl error */
+#define multistatement(ms) (ms) /* trick to bypass checkpatch.pl error */
 /*
 #define _entry multistatement(trllog(); goto _entry; _entry)
 */
