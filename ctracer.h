@@ -105,7 +105,6 @@ extern __thread int ret;
 
 #define trl_in() do_statement(trace_time(); trlm("{");)
 #define trl_out() do_statement(trace_time(); trlm("}");)
-#define empty_statement() do { } while (0)
 
 #define trace_mem(P, N)							    \
 	IFTRACE({							    \
@@ -290,10 +289,10 @@ static inline unsigned int _hweight32(unsigned int w)
 #else /* !CTRACER_ON */
 #define trllog(args ...)
 
-#define IFTRACE(x) empty_statement()
-#define trace_linux_mem() empty_statement()
+#define IFTRACE(x)
+#define trace_linux_mem()
 #define tracef(fmt, args...)
-#define stack_trace() empty_statement()
+#define stack_trace()
 
 #endif /* _TARCE */
 
@@ -374,7 +373,7 @@ void static inline trace_time()
 #endif
 
 #else
-#define trace_time() empty_statement()
+#define trace_time()
 #endif
 
 #ifdef __GLIBC__XX
