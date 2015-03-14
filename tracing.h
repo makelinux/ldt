@@ -6,7 +6,8 @@
  *	ctracer_cut_paths - return filename without path
  */
 
-#define trace_loc()	printk(KERN_DEBUG"%s:%d %s ", __file__, __LINE__, __func__)
+#define trace_loc() \
+	printk(KERN_DEBUG"%s:%d %s ", __file__, __LINE__, __func__)
 #define trace_hex(h)	printk("%s = 0x%lX ", #h, (long int)h)
 #define trace_dec(d)	printk("%s = %ld ", #d, (long int)d)
 #define trace_dec_ln(d)	printk("%s = %ld\n", #d, (long int)d)
