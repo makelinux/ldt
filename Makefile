@@ -10,7 +10,6 @@ obj-m+= ldt.o
 obj-m+= ldt_plat_drv.o # implements platform_driver only
 obj-m+= ldt_plat_dev.o # implements platform_device and resource
 #obj-m+= chrdev_region_sample.o
-obj-m+= ldt_configfs_basic.o
 obj-m+= kthread_sample.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
