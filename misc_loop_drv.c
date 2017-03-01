@@ -38,7 +38,6 @@
 #include <linux/miscdevice.h>
 #include <linux/serial_reg.h>
 #include <linux/cdev.h>
-#include <asm/apic.h>
 
 #include "common.h"
 
@@ -124,7 +123,7 @@ static void misc_loop_drv_tasklet_func(unsigned long d)
 		   we simulate interrupt invocation with function send_IPI_all.
 		   In driver, which works with real hardware this is not required.
 		 */
-		apic->send_IPI_all(IRQ0_VECTOR+irq);
+		apic->send_IPI_all(ISA_IRQ_VECTOR(irq));
 	}
 	while ( ioread8(drvdata->port_ptr + MISC_DRV_RX_READY)) {
 		data_in = ioread8(drvdata->port_ptr + MISC_DRV_RX);

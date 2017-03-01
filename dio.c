@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <err.h>
 #include <getopt.h>
 #include <string.h>
 #include <sys/param.h>
@@ -29,6 +30,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <linux/ioctl.h>
+#include <sys/ioctl.h>
 #include "ctracer.h"
 
 static enum io_type {
