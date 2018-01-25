@@ -9,6 +9,7 @@
 */
 
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
+#pragma GCC diagnostic ignored "-Wunused-label"
 
 #if 0
 /* Optional configuration flags: */
@@ -26,6 +27,9 @@
 
 	sed -i '\-)-{ N; s-)\([\r\n]\+\){$-)\1{\t_entry:;- }'
 
+	Trace return error:
+	:%s-return -\(E\w*\);-{trlm("\1");return -\1;}
+
 	remove:
 	sed -i 's-{\t_entry:;-{-' $(grep -lr $'^{\t_entry:' .)
  */
@@ -34,7 +38,7 @@
 
 #ifndef CTRACER_H_INCLUDED
 #define CTRACER_H_INCLUDED
-extern __thread int ret;
+extern __thread int ctracer_ret;
 
 #define multistatement(ms) ms /* trick to bypass checkpatch.pl error */
 
@@ -138,25 +142,25 @@ if (!((i+1) % 64)) \
 
 #define chkz(a) \
 (p = a,\
-	((!p) ? tracef("%s %i %s FAIL %i = %s\n", __FILE__, __LINE__, __func__, p, #a) : 0),\
+	((!p) ? tracef("%s %i %s FAIL %i = %s\n", __file__, __LINE__, __func__, p, #a) : 0),\
 	p)
 
 #define chkn(a) \
-(ret = a,\
-	((ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n", __FILE__, __LINE__, __func__, ret, #a)\
-	 : 0), ret)
+(ctracer_ret = a,\
+	((ctracer_ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n", __file__, __LINE__, __func__, ctracer_ret, #a)\
+	 : 0), ctracer_ret)
 
 #define chkne(a) \
 (/* tracef("calling  %s\n",#a), */ \
-	ret = a,\
-	((ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n", __FILE__, __LINE__, __func__, errno, strerror(errno), ret, #a)\
-	 : 0), ret)
+	ctracer_ret = a,\
+	((ctracer_ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n", __file__, __LINE__, __func__, errno, strerror(errno), ctracer_ret, #a)\
+	 : 0), ctracer_ret)
 
 #define chkn2(a) \
-(ret = a,\
-	((ret < 0) ? tracef("%s %i %s FAIL %i = %s\n", __FILE__, __LINE__, __func__, ret, #a)\
-	 : tracef("%s %i %s %i = %s\n", __FILE__, __LINE__, __func__, ret, #a)),\
-	ret)
+(ctracer_ret = a,\
+	((ctracer_ret < 0) ? tracef("%s %i %s FAIL %i = %s\n", __file__, __LINE__, __func__, ctracer_ret, #a)\
+	 : tracef("%s %i %s %i = %s\n", __file__, __LINE__, __func__, ctracer_ret, #a)),\
+	ctracer_ret)
 
 #ifndef once
 #define once(exp) do_statement( \
@@ -281,7 +285,11 @@ static inline int empty_function(void)
 //#ifdef MODULE
 #if 1
 /* omit full absolute path for modules */
+#ifdef __GNUG__
+//#include <string.h>
+#else
 extern char *strrchr(const char *s, int c);
+#endif
 #define ctracer_cut_path(fn) (fn[0] != '/' ? fn : (strrchr(fn, '/') + 1))
 #define __file__	ctracer_cut_path(__FILE__)
 #else

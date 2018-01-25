@@ -51,6 +51,7 @@ static int loops;
 static int delay;
 static char ioctl_type = 'A';
 __thread int ret;
+__thread int ctracer_ret;
 static int ro, wo; /* read only, write only*/
 
 /*
