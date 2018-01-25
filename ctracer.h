@@ -70,23 +70,23 @@ extern __thread int ctracer_ret;
 	v<letter> = printf Variable in specified format (d, x, f, s, etc)
 */
 
-#define trla(fmt, args...) tracef("%s:%i %s "fmt, __file__, __LINE__, __func__, ## args)
-#define trv(t, v) tracef(#v" = %"t EOL, v)
-#define trv_(t, v) tracef(#v" = %"t" ", v)
-#define trvd(d) tracef(#d" = %ld"EOL, (long int)d)
-#define trvd_(d) tracef(#d" = %ld ", (long int)d)
-#define trvx_(x) tracef(#x" = 0x%X ", (int)x)
-#define trvx(x) tracef(#x" = 0x%X"EOL, (int)x)
-#define trvlx(x) tracef(#x" = %#llx"EOL, (int)x)
-#define trvX(x) tracef(#x" = %X"EOL, (int)x)
-#define trvX_(x) tracef(#x" = %X"EOL, (int)x)
-#define trvf(f) tracef(#f" = %f"EOL, f)
-#define trvf_(f) tracef(#f" = %f ", f)
+#define trla(fmt, args...) tracef("%s:%i %s " fmt, __file__, __LINE__, __func__, ## args)
+#define trv(t, v) tracef(#v " = %" t EOL, v)
+#define trv_(t, v) tracef(#v " = %" t " ", v)
+#define trvd(d) tracef(#d " = %ld" EOL, (long int)d)
+#define trvd_(d) tracef(#d " = %ld ", (long int)d)
+#define trvx_(x) tracef(#x " = 0x%X ", (int)x)
+#define trvx(x) tracef(#x " = 0x%X" EOL, (int)x)
+#define trvlx(x) tracef(#x " = %#llx" EOL, (int)x)
+#define trvX(x) tracef(#x " = %X" EOL, (int)x)
+#define trvX_(x) tracef(#x " = %X" EOL, (int)x)
+#define trvf(f) tracef(#f " = %f" EOL, f)
+#define trvf_(f) tracef(#f " = %f ", f)
 #define trvtv_(tv) tracef(#tv" = %u.%06u ", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
-#define trvtv(tv) tracef(#tv" = %u.%06u"EOL, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
+#define trvtv(tv) tracef(#tv " = %u.%06u" EOL, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
 #define trvs(s) tracef(#s " = \"%s\"" EOL, s)
 #define trvs_(s) tracef(#s" = \"%s\" ", s)
-#define trvp(p) tracef(#p" = %016zX"EOL, (size_t)p)
+#define trvp(p) tracef(#p " = %016zX" EOL, (size_t)p)
 #define trvp_(p) tracef(#p" = %016zX ", (size_t)p)
 #define trvdn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%d:%d,", i, (*((int *)d+i))); tracef(EOL); }
 #define trvxn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%04x,", (*((int *)d+i))); tracef(EOL); }
@@ -94,18 +94,18 @@ extern __thread int ctracer_ret;
 #define trvxr(record) trvxn(&record, sizeof(record)/sizeof(int));
 
 /* trvdnz - TRace Digital Variable, if Not Zero */
-#define trvdnz(d) { if (d) tracef(#d" = %d"EOL, (int)d); }
+#define trvdnz(d) { if (d) tracef(#d " = %d" EOL, (int)d); }
 #define trace_call(a) do { trla("calling %s {\n", #a); a; tracef("} done\n"); } while (0)
 
 /* trlm - TRace Location, with Message */
-#define trlm(m) tracef(SOL"%s:%i:0 %s %s"EOL, __file__, __LINE__, __func__, m)
-#define trlm_(m) tracef(SOL"%s:%i:0 %s %s ", __file__, __LINE__, __func__, m)
+#define trlm(m) tracef(SOL "%s:%i %s %s" EOL, __file__, __LINE__, __func__, m)
+#define trlm_(m) tracef(SOL"%s:%i %s %s ", __file__, __LINE__, __func__, m)
 #define trl() do { trace_time(); trlm(""); } while (0)
 #define trl_() tracef(SOL"%s:%i %s ", __file__, __LINE__, __func__)
 #define trln() tracef(EOL)
 
-#define trlvd(d) tracef("%s:%d %s %s=%lld\n",__FILE__,__LINE__,__func__,#d,(long long)d)
-#define trlvx(x) tracef("%s:%d %s %s=0x%X\n",__FILE__,__LINE__,__func__,#x,(int)x)
+#define trlvd(d) tracef("%s:%d %s %s=%lld\n",__file__,__LINE__,__func__,#d,(long long)d)
+#define trlvx(x) tracef("%s:%d %s %s=0x%X\n",__file__,__LINE__,__func__,#x,(int)x)
 
 #define trl_in() do_statement(trace_time(); trlm("{");)
 #define trl_out() do_statement(trace_time(); trlm("}");)
@@ -400,7 +400,7 @@ static inline void __on_cleanup(char *s[])
 {
 	if (*s) {
 #ifdef __KERNEL__
-		tracef(SOL"%s"EOL, *s);
+		tracef(SOL "%s" EOL, *s);
 		vfree(*s);
 #else
 		fputs(*s, stderr);
@@ -427,7 +427,7 @@ int lookup_symbol_name(unsigned long addr, char *symname);
 	if (_trace_enter_num < 100) { \
 		/* _ret_msg = vmalloc(_CTRACRE_BUF_LEN); \
 		_ret_msg && snprintf(_ret_msg, _CTRACRE_BUF_LEN, "%s < %s }", _caller, __func__); */ \
-		tracef(SOL"%s > %s { @ %s:%d #%d"EOL, _caller, __func__,  __file__, __LINE__, _trace_enter_num); \
+		tracef(SOL " %s > %s { @ %s:%d #%d" EOL, _caller, __func__,  __file__, __LINE__, _trace_enter_num); \
 	} }
 
 #define _trace_enter() \
@@ -435,7 +435,7 @@ int lookup_symbol_name(unsigned long addr, char *symname);
 	if (_hweight32(_trace_enter_num) < 2) {		\
 		char _caller[_CTRACRE_BUF_LEN]; \
 		lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller); \
-		tracef(SOL"%s:%d  %s > %s #%d"EOL, __file__, __LINE__, _caller, __func__, _trace_enter_num); \
+		tracef(SOL " %s:%d  %s > %s #%d" EOL, __file__, __LINE__, _caller, __func__, _trace_enter_num); \
 	}						\
 	_trace_enter_num++;		\
 
