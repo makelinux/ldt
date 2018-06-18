@@ -201,6 +201,23 @@ static irqreturn_t ldt_isr(int irq, void *dev_id)
  *	timer section
  */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
+
+static void ldt_timer_func(struct timer_list *ldt_timer)
+{
+	/*
+	 *      this timer is used just to fire ldt_tasklet,
+	 *      because there is no interrupts in loopback mode
+	 */
+	if (loopback)
+		tasklet_schedule(&ldt_tasklet);
+	mod_timer(ldt_timer, jiffies + HZ / 100);
+}
+
+static DEFINE_TIMER(ldt_timer, ldt_timer_func);
+
+#else
+
 static struct timer_list ldt_timer;
 
 static void ldt_timer_func(unsigned long data)
@@ -215,6 +232,8 @@ static void ldt_timer_func(unsigned long data)
 }
 
 static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
+
+#endif
 
 /*
  *	file_operations section
