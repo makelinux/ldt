@@ -3,6 +3,9 @@
 
 	implemented in single h-file
 
+	Original source:
+	https://gitlab.com/makelinux/ldt/blob/master/ctracer.h
+
 	Copyright (C) 2012 Constantine Shulyupin  http://www.makelinux.net/
 
 	Dual BSD/GPL License
