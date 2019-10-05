@@ -46,6 +46,7 @@ _entry:
 		p = of_get_property(pdev->dev.of_node, "property", NULL);
 		if (p)
 			property = be32_to_cpu(*p);
+		(void)property;
 	}
 #endif
 	/*
@@ -53,9 +54,10 @@ _entry:
 	   struct ldt_data *drvdata = platform_get_drvdata(pdev);
 	   platform_set_drvdata(pdev, drvdata);
 	*/
-
+	(void)data;
 	data = dev_get_platdata(&pdev->dev);
 	pr_debug("%p %s\n", data, data);
+	(void)r;
 	r = platform_get_resource(pdev, IORESOURCE_IO, 0);
 	port = r->start;
 	port_size = resource_size(r);
@@ -82,7 +84,7 @@ _entry:
  */
 
 static const struct of_device_id ldt_of_match[] = {
-	{.compatible = "linux-driver-template",},
+	{.compatible = "linux-driver-template"},
 	{},
 };
 

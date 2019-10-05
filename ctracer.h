@@ -10,8 +10,9 @@
 
 	Dual BSD/GPL License
 */
-
+#ifndef __cplusplus
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
+#endif
 #pragma GCC diagnostic ignored "-Wunused-label"
 
 #if 0
@@ -35,6 +36,10 @@
 
 	remove:
 	sed -i 's-{\t_entry:;-{-' $(grep -lr $'^{\t_entry:' .)
+
+	cmake -DCMAKE_CXX_FLAGS='-DCTRACER_ON -include ctracer.h'
+
+	make CXX_FLAGS='-DCTRACER_ON -include ctracer.h'  VERBOSE=1
  */
 
 #ifndef __ASSEMBLY__

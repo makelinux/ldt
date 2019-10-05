@@ -150,7 +150,7 @@ static inline u8 rx_ready(void)
 
 static void ldt_tasklet_func(unsigned long d)
 {
-	char data_out, data_in;
+	char data_out;
 
 	if (drvdata->uart_detected) {
 		while (tx_ready() && kfifo_out_spinlocked(&drvdata->out_fifo,
@@ -161,6 +161,7 @@ static void ldt_tasklet_func(unsigned long d)
 			ldt_send(data_out);
 		}
 		while (rx_ready()) {
+			char data_in;
 			data_in = ioread8(drvdata->port_ptr + UART_RX);
 			pr_debug("data_in=%d %c\n", data_in, data_in >= 32 ? data_in : ' ');
 			ldt_received(data_in);
@@ -201,7 +202,7 @@ static irqreturn_t ldt_isr(int irq, void *dev_id)
  *	timer section
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 
 static void ldt_timer_func(struct timer_list *ldt_timer)
 {

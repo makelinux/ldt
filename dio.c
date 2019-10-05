@@ -275,8 +275,7 @@ default values are marked with '*'\n\
 Samples:\n\
 \n\
 TBD\n\
-\n\
-";
+\n";
 
 int init(int argc, char *argv[])
 {
