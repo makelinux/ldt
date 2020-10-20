@@ -11,6 +11,7 @@ obj-m+= ldt_plat_drv.o # implements platform_driver only
 obj-m+= ldt_plat_dev.o # implements platform_device and resource
 #obj-m+= chrdev_region_sample.o
 obj-m+= kthread_sample.o
+obj-m+= pci-ldt.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
@@ -30,6 +31,7 @@ dio: CPPFLAGS+= -DCTRACER_ON -include ctracer.h -g
 
 #_src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c ctracer.h tracing.h
 _src = dio.c  ldt.c  ldt_plat_dev.c  ldt_plat_drv.c ctracer.h ldt_configfs_basic.c misc_loop_drv.c
+_src+= pci-ldt.c
 
 checkpatch:
 	checkpatch.pl --no-tree --show-types --ignore LINE_CONTINUATIONS --terse -f $(_src) Makefile
