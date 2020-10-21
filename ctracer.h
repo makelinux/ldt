@@ -200,6 +200,7 @@ extern void vfree(const void *addr);
 
 #ifdef TRACE_LINUX_MEMORY_ON
 #include <linux/mmzone.h>
+#undef pr_fmt
 
 extern int free_pages_prev;
 #define trace_linux_mem() do { \
@@ -294,7 +295,7 @@ static inline int empty_function(void)
 #else
 extern char *strrchr(const char *s, int c);
 #endif
-#define ctracer_cut_path(fn) (fn[0] != '/' ? fn : (strrchr(fn, '/') + 1))
+#define ctracer_cut_path(fn) (!strrchr(fn, '/') ? fn : (strrchr(fn, '/') + 1))
 #define __file__	ctracer_cut_path(__FILE__)
 #else
 #define __file__	__FILE__
@@ -403,11 +404,10 @@ extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
 static inline void __on_cleanup(char *s[])
 {
 	if (*s) {
+		tracef("%s" EOL, *s);
 #ifdef __KERNEL__
-		tracef(SOL "%s" EOL, *s);
 		vfree(*s);
 #else
-		fputs(*s, stderr);
 		free(*s);
 #endif
 	}
