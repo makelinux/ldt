@@ -17,6 +17,9 @@ KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
 all:	modules dio
 
+check:
+	./ldt-test
+
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules
 
@@ -24,7 +27,9 @@ modules_install:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules_install
 
 clean:
-	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions modules.order Module.symvers dio *.tmp *.log
+	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c *.mod \
+		.tmp_versions modules.order Module.symvers .cache.mk \
+		dio *.tmp *.log
 
 dio: CPPFLAGS+= -DCTRACER_ON -include ctracer.h -g
 #dio: CPPFLAGS+= -D VERBOSE

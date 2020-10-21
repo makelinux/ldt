@@ -11,7 +11,8 @@ make -B ctracer-test && ./ctracer-test
 KERNELDIR=/lib/modules/$(uname -r)/build; \
 make -B -C ${KERNELDIR} M=$PWD modules obj-m=ctracer-test.o; \
 sudo insmod ./ctracer-test.ko; \
-sudo rmmod ctracer-test
+sudo rmmod ctracer-test; \
+dmesg
 
  */
 
@@ -55,4 +56,5 @@ static void mod_exit(void)
 }
 module_exit(mod_exit);
 
+MODULE_LICENSE("GPL");
 #endif
