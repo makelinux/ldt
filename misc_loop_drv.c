@@ -39,8 +39,6 @@
 #include <linux/serial_reg.h>
 #include <linux/cdev.h>
 
-#include "common.h"
-
 #undef pr_fmt
 #define pr_fmt(fmt)  "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
 
@@ -286,7 +284,7 @@ static struct misc_loop_drv_data *misc_loop_drv_data_init(void)
 	return drvdata;
 }
 
-static __devinit int misc_loop_drv_init(void)
+static int misc_loop_drv_init(void)
 {
 	int ret = 0;
 

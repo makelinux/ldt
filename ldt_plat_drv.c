@@ -18,14 +18,13 @@
 #include <linux/mod_devicetable.h>
 #include <linux/of_irq.h>
 
-#include "common.h"
 #include "tracing.h"
 
 static int irq;
 static int port;
 static int port_size;
 
-static __devinit int ldt_plat_probe(struct platform_device *pdev)
+static int ldt_plat_probe(struct platform_device *pdev)
 {
 	char *data = NULL;
 	struct resource *r;
@@ -72,7 +71,7 @@ _entry:
 	return 0;
 }
 
-static int __devexit ldt_plat_remove(struct platform_device *pdev)
+static int ldt_plat_remove(struct platform_device *pdev)
 {
 _entry:
 	return 0;
@@ -120,7 +119,7 @@ static struct platform_driver ldt_plat_driver = {
 		   .of_match_table = of_match_ptr(ldt_of_match),
 		   },
 	.probe = ldt_plat_probe,
-	.remove = __devexit_p(ldt_plat_remove),
+	.remove = ldt_plat_remove,
 
 };
 

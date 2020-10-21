@@ -46,8 +46,7 @@
 #include <linux/serial_reg.h>
 #include <linux/debugfs.h>
 #include <linux/cdev.h>
-
-#include "common.h"
+#include <linux/version.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
@@ -548,7 +547,7 @@ static struct ldt_data *ldt_data_init(void)
 	return drvdata;
 }
 
-static __devinit int ldt_init(void)
+static int ldt_init(void)
 {
 	int ret = 0;
 
