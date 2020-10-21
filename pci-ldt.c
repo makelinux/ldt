@@ -72,6 +72,13 @@ static irqreturn_t pci_ldt_irq(int irq, struct instance_data *d)
 	return IRQ_HANDLED;
 }
 
+static void pci_ldt_free(struct pci_dev *pcid)
+{
+	pci_free_irq_vectors(pcid);
+	pcim_iounmap_regions(pcid, pci_select_bars(pcid, IORESOURCE_MEM));
+	pci_disable_device(pcid);
+}
+
 static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 {
 	struct instance_data *data;
@@ -125,9 +132,7 @@ static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 	return 0;
 error:
 	dev_dbg(&pcid->dev, "Error %d adding %04X:%04X\n", ret, pcid->vendor, pcid->device);
-	pci_free_irq_vectors(pcid);
-	pcim_iounmap_regions(pcid, pci_select_bars(pcid, IORESOURCE_MEM));
-	pci_disable_device(pcid);
+	pci_ldt_free(pcid);
 	return ret;
 }
 
@@ -137,9 +142,7 @@ static void pci_ldt_remove(struct pci_dev *pcid)
 
 	trlvd(irqs);
 	pci_free_irq(pcid, 0, pci_get_drvdata(pcid));
-	pci_free_irq_vectors(pcid);
-	pcim_iounmap_regions(pcid, pci_select_bars(pcid, IORESOURCE_MEM));
-	pci_disable_device(pcid);
+	pci_ldt_free(pcid);
 	dev_notice(&pcid->dev, "Removed %04X:%04X\n", pcid->vendor, pcid->device);
 }
 
