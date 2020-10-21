@@ -106,10 +106,10 @@ extern __thread int ctracer_ret;
 #define trace_call(a) do { trla("calling %s {\n", #a); a; tracef("} done\n"); } while (0)
 
 /* trlm - TRace Location, with Message */
-#define trlm(m) tracef(SOL "%s:%i %s %s" EOL, __file__, __LINE__, __func__, m)
-#define trlm_(m) tracef(SOL"%s:%i %s %s ", __file__, __LINE__, __func__, m)
+#define trlm(m) tracef("%s:%i %s %s" EOL, __file__, __LINE__, __func__, m)
+#define trlm_(m) tracef("%s:%i %s %s ", __file__, __LINE__, __func__, m)
 #define trl() do { trace_time(); trlm(""); } while (0)
-#define trl_() tracef(SOL"%s:%i %s ", __file__, __LINE__, __func__)
+#define trl_() tracef("%s:%i %s ", __file__, __LINE__, __func__)
 #define trln() tracef(EOL)
 
 #define trlvd(d) tracef("%s:%d %s %s=%lld\n",__file__,__LINE__,__func__,#d,(long long)d)
@@ -211,8 +211,8 @@ if (mem_change) { \
 } while (0)
 #endif
 
-//#define SOL KERN_DEBUG
-#define SOL KERN_NOTICE
+
+
 #define tracef(fmt, args...) printk(fmt, ##args)
 
 #else /* !__KERNEL__ */
@@ -284,9 +284,6 @@ static inline int empty_function(void)
 
 #endif /* _TARCE */
 
-#ifndef SOL
-#define SOL ""
-#endif
 #define EOL "\n" /* for console */
 
 //#ifdef MODULE
