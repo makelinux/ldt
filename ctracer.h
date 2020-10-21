@@ -84,7 +84,7 @@ extern __thread int ctracer_ret;
 #define trvd(d) tracef(#d " = %ld" EOL, (long int)d)
 #define trvd_(d) tracef(#d " = %ld ", (long int)d)
 #define trvx_(x) tracef(#x " = 0x%X ", (int)x)
-#define trvx(x) tracef(#x " = 0x%X" EOL, (int)x)
+#define trvx(x) tracef(#x " = 0x%lX" EOL, (long int)x)
 #define trvlx(x) tracef(#x " = %#llx" EOL, (int)x)
 #define trvX(x) tracef(#x " = %X" EOL, (int)x)
 #define trvX_(x) tracef(#x " = %X" EOL, (int)x)
@@ -92,7 +92,7 @@ extern __thread int ctracer_ret;
 #define trvf_(f) tracef(#f " = %f ", f)
 #define trvtv_(tv) tracef(#tv" = %u.%06u ", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
 #define trvtv(tv) tracef(#tv " = %u.%06u" EOL, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
-#define trvs(s) tracef(#s " = \"%s\"" EOL, s)
+#define trvs(s) tracef(#s " = \"%s\"" EOL, (char*)s)
 #define trvs_(s) tracef(#s" = \"%s\" ", s)
 #define trvp(p) tracef(#p " = %016zX" EOL, (size_t)p)
 #define trvp_(p) tracef(#p" = %016zX ", (size_t)p)
@@ -112,8 +112,8 @@ extern __thread int ctracer_ret;
 #define trl_() tracef("%s:%i %s ", __file__, __LINE__, __func__)
 #define trln() tracef(EOL)
 
-#define trlvd(d) tracef("%s:%d %s %s=%lld\n",__file__,__LINE__,__func__,#d,(long long)d)
-#define trlvx(x) tracef("%s:%d %s %s=0x%X\n",__file__,__LINE__,__func__,#x,(int)x)
+#define trlvd(d) tracef("%s:%d %s %s=%ld\n",__file__,__LINE__,__func__,#d,(long int)(d))
+#define trlvx(x) tracef("%s:%d %s %s=0x%lX\n",__file__,__LINE__,__func__,#x,(long int)(x))
 
 #define trl_in() do_statement(trace_time(); trlm("{");)
 #define trl_out() do_statement(trace_time(); trlm("}");)
