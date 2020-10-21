@@ -413,15 +413,37 @@ static inline void __on_cleanup(char *s[])
 	}
 }
 
-#define _CTRACRE_BUF_LEN 100
+#define _CTRACRE_BUF_LEN 200
 
-#if !defined(__KERNEL__) || defined(MODULE)
+#if defined(__KERNEL__) && !defined(MODULE)
+char *strsep(char **stringp, const char *delim);
 static inline int lookup_symbol_name(unsigned long addr, char *symbol)
-{
-	return snprintf(symbol, _CTRACRE_BUF_LEN, "%016lX", addr);
+{ char **strings;
+	strings = backtrace_symbols((void * const*)&addr, 1);
+	int r;
+	if (strings && strings[0]) {
+
+		char *s = strings[0];
+		char *w1 = strsep(&s," (+)");
+		char *w2 = strsep(&s," (+)");
+		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%s", w2 && *w2 ? w2 : w1);
+	}
+	else
+		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%lX", addr);
+	free(strings);
+	return r;
 }
 #else
-int lookup_symbol_name(unsigned long addr, char *symname);
+/*	func lookup_symbol_name is defined in the kernel but is not
+	exported to be used in modules
+ */
+int lookup_symbol_name(unsigned long addr, char *symbol)
+{
+	 return snprintf(symbol, _CTRACRE_BUF_LEN, "%016lX", addr);
+}
+#endif
+#if defined(__KERNEL__)
+#define malloc(s) vmalloc(s)
 #endif
 #define _trace_enter_exit_() \
 	char __attribute__((cleanup(__on_cleanup))) *_ret_msg = NULL; \
@@ -429,9 +451,9 @@ int lookup_symbol_name(unsigned long addr, char *symname);
 	{ char _caller[_CTRACRE_BUF_LEN]; \
 	lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller); \
 	if (_trace_enter_num < 100) { \
-		/* _ret_msg = vmalloc(_CTRACRE_BUF_LEN); \
-		_ret_msg && snprintf(_ret_msg, _CTRACRE_BUF_LEN, "%s < %s }", _caller, __func__); */ \
-		tracef(SOL " %s > %s { @ %s:%d #%d" EOL, _caller, __func__,  __file__, __LINE__, _trace_enter_num); \
+		_ret_msg = malloc(_CTRACRE_BUF_LEN); \
+		if (_ret_msg) snprintf(_ret_msg, _CTRACRE_BUF_LEN, "%s < %s }", _caller, __func__);  \
+		tracef("%s > %s { @ %s:%d #%d" EOL, _caller, __func__,  __file__, __LINE__, _trace_enter_num); \
 	} }
 
 #define _trace_enter() \
@@ -439,7 +461,7 @@ int lookup_symbol_name(unsigned long addr, char *symname);
 	if (_hweight32(_trace_enter_num) < 2) {		\
 		char _caller[_CTRACRE_BUF_LEN]; \
 		lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller); \
-		tracef(SOL " %s:%d  %s > %s #%d" EOL, __file__, __LINE__, _caller, __func__, _trace_enter_num); \
+		tracef("%s:%d  %s > %s #%d" EOL, __file__, __LINE__, _caller, __func__, _trace_enter_num); \
 	}						\
 	_trace_enter_num++;		\
 
