@@ -44,6 +44,15 @@ int main(void)
 	trvd(sizeof(int));
 	trvd(sizeof(short));
 	trvd(sizeof(char));
+	if (0)
+		tracef("Should not be printed\n");
+	else
+		tracef("Should be printed\n");
+	if (1)
+		tracef("Should be printed\n");
+	else
+		tracef("Should not be printed\n");
+
 	return 0;
 }
 

@@ -218,8 +218,7 @@ if (mem_change) { \
 #else /* !__KERNEL__ */
 /* CTRACER_ON and not __KERNEL__ */
 #include <stdio.h>
-
-#define tracef(args...) fprintf(stderr, ##args)
+#define tracef(fmt, args...) ({ flockfile(stderr); fprintf(stderr, fmt, ##args); funlockfile(stderr);})
 
 #if 0
 #include <signal.h>
