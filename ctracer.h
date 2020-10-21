@@ -53,12 +53,12 @@ extern __thread int ctracer_ret;
 #ifdef CTRACER_ON
 
 //#define _entry multistatement(trllog(); goto _entry; _entry)
-#define _entry multistatement(_trace_enter(); goto _entry; _entry)
+//#define _entry multistatement(_trace_enter(); goto _entry; _entry)
 
-/*
+
 #define _entry multistatement(_trace_enter_exit_(); \
 	goto _entry_second; _entry_second)
- */
+
 //#define _entry once(trl()); goto _entry; _entry
 /*
 #define return trlm("} "); return
