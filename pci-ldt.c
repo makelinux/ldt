@@ -66,10 +66,17 @@ static irqreturn_t pci_ldt_irq(int irq, struct instance_data *d)
 		dev_info(&d->pcid->dev, "%x\n", pci_status_get_and_clear_errors(d->pcid));
 #endif
 	}
-	++irqs;
-	/* TODO: process interrupt */
+	/* TODO: check interrupt */
+	return IRQ_WAKE_THREAD;
+}
 
+static irqreturn_t pci_ldt_th(int irq, struct instance_data *d)
+{
+	/* TODO: process interrupt
 	return IRQ_HANDLED;
+	*/
+	++irqs;
+	return IRQ_NONE;
 }
 
 static void pci_ldt_free(struct pci_dev *pcid)
@@ -111,7 +118,7 @@ static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 	if (ret < 1) {
 		goto error;
 	}
-	ret = pci_request_irq(pcid, 0, (void *)pci_ldt_irq, NULL, data, "%s", pci_name(pcid));
+	ret = pci_request_irq(pcid, 0, (void *)pci_ldt_irq, (void *)pci_ldt_th, data, "%s", pci_name(pcid));
 	if (ret) {
 		dev_err(&pcid->dev, "request_irq failed\n");
 		goto error;
