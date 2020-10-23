@@ -116,7 +116,8 @@ static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 	pci_set_drvdata(pcid, data);
 	ret = pci_alloc_irq_vectors(pcid, 1, 1, PCI_IRQ_ALL_TYPES);
 	if (ret < 1) {
-		goto error;
+		pci_ldt_free(pcid);
+		return -ENODEV;
 	}
 	ret = pci_request_irq(pcid, 0, (void *)pci_ldt_irq, (void *)pci_ldt_th, data, "%s", pci_name(pcid));
 	if (ret) {
