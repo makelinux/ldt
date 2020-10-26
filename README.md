@@ -25,26 +25,3 @@ Simple misc driver with read, write, fifo, tasklet and IRQ:
 **[misc_loop_drv.c](https://github.com/makelinux/ldt/blob/master/misc_loop_drv.c)**
 
 Browse the rest of source: https://github.com/makelinux/ldt/
-
-
-## Compiled and tested on Linux versions:
-
-v4.10 - compiled only
-
-4.4.0-62-generic (Ubuntu 16.04.1)
-
-3.19.0-33-generic (Ubuntu 15.04)
-
-3.13.0-37-generic (Ubuntu 14.04.1 LTS)
-
-3.2.0-30-generic-pae (Ubuntu 12.04 LTS)
-
-2.6.38-11-generic (Ubuntu 11.04)
-
-v2.6.37-rc8
-
-v2.6.36-rc8
-
-### Failed compilation with:
-
-v2.6.35-rc6 failed because of DEFINE_FIFO
