@@ -86,8 +86,6 @@ extern __thread int ctracer_ret;
 #define trvx_(x) tracef(#x " = 0x%X ", (int)x)
 #define trvx(x) tracef(#x " = 0x%lX" EOL, (long int)x)
 #define trvlx(x) tracef(#x " = %#llx" EOL, (int)x)
-#define trvX(x) tracef(#x " = %X" EOL, (int)x)
-#define trvX_(x) tracef(#x " = %X" EOL, (int)x)
 #define trvf(f) tracef(#f " = %f" EOL, f)
 #define trvf_(f) tracef(#f " = %f ", f)
 #define trvtv_(tv) tracef(#tv" = %u.%06u ", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
