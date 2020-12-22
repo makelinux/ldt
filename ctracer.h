@@ -23,7 +23,15 @@
 #define TRACE_LINUX_MEMORY_ON
 #endif
 /*
+	Usages:
+
+	cmake -DCMAKE_CXX_FLAGS='-include ctracer.h'
+
+	make CXX_FLAGS='-include ctracer.h'  VERBOSE=1
+
+
 	VI command to include label _entry to each function start for tracing
+
 	:%s-) *\n{ *$-)\r{\t_entry:;-
 	:%s-\(return ret;\)-do {trlm("return");\1} while (0)-
 	:%s-return \(.*\);-do {trlm("\1");return \1;} while (0);-g
@@ -38,9 +46,6 @@
 	remove:
 	sed -i 's-{\t_entry:;-{-' $(grep -lr $'^{\t_entry:' .)
 
-	cmake -DCMAKE_CXX_FLAGS='-DCTRACER_ON -include ctracer.h'
-
-	make CXX_FLAGS='-DCTRACER_ON -include ctracer.h'  VERBOSE=1
  */
 
 #ifndef __ASSEMBLY__

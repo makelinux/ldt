@@ -20,6 +20,12 @@ all:	modules dio
 check:
 	./ldt-test
 
+ctracer-check:
+	$(MAKE) -B ctracer-test && ./ctracer-test
+	KERNELDIR=/lib/modules/$(uname -r)/build; make -B -C ${KERNELDIR} M=$$PWD modules obj-m=ctracer-test.o && \
+		  sudo insmod ./ctracer-test.ko && sudo rmmod ctracer-test && dmesg;
+	$(MAKE) -B ctracer-testpp && ./ctracer-testpp
+
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules
 
