@@ -22,6 +22,10 @@ make -B ctracer-test && ./ctracer-test
 
 #ifdef __KERNEL__
 #include <linux/module.h>
+#include <linux/sysinfo.h>
+#include <linux/mm.h>
+#else
+#include <sys/sysinfo.h>
 #endif
 
 int sub(void)
@@ -53,6 +57,7 @@ int main(void)
 	else
 		tracef("Should not be printed\n");
 
+	freeram();
 	return 0;
 }
 

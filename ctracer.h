@@ -216,6 +216,7 @@ if (mem_change) { \
 
 #else /* !__KERNEL__ */
 /* !CTRACER_OFF and not __KERNEL__ */
+#define si_meminfo sysinfo
 #include <stdio.h>
 #define tracef(fmt, args...) ({ flockfile(stderr); fprintf(stderr, fmt, ##args); funlockfile(stderr);})
 
@@ -380,9 +381,9 @@ static inline void stack_trace(void)
 
 /* see also nr_free_pages */
 #define freeram() { \
-	static unsigned int last; struct sysinfo i; si_meminfo(&i); trl_(); \
-	int d = last-i.freeram; int used = i.totalram-i.freeram; \
-	trvi_(i.freeram); trvi_(used);  trvi(d); \
+	static size_t last; struct sysinfo i; si_meminfo(&i); trl_(); \
+	unsigned long d = last-i.freeram; size_t used = i.totalram-i.freeram; \
+	trvd_(i.freeram); trvd_(used); trvd(d); \
 	last = i.freeram; }
 
 extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
