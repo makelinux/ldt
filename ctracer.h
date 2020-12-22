@@ -1,3 +1,4 @@
+#pragma once
 /*
 	Tracing utility for C
 
@@ -81,11 +82,11 @@ extern __thread int ctracer_ret;
 #define trla(fmt, args...) tracef("%s:%i %s " fmt, __file__, __LINE__, __func__, ## args)
 #define trv(t, v) tracef(#v " = %" t EOL, v)
 #define trv_(t, v) tracef(#v " = %" t " ", v)
-#define trvd(d) tracef(#d " = %ld" EOL, (long int)d)
-#define trvd_(d) tracef(#d " = %ld ", (long int)d)
+#define trvd(d) tracef(#d " = %ld" EOL, (long int)(d))
+#define trvd_(d) tracef(#d " = %ld ", (long int)(d))
 #define trvx_(x) tracef(#x " = 0x%X ", (int)x)
 #define trvx(x) tracef(#x " = 0x%lX" EOL, (long int)x)
-#define trvlx(x) tracef(#x " = %#llx" EOL, (int)x)
+#define trvlx(x) tracef(#x " = %#llx" EOL, (long long)(x))
 #define trvf(f) tracef(#f " = %f" EOL, f)
 #define trvf_(f) tracef(#f " = %f ", f)
 #define trvtv_(tv) tracef(#tv" = %u.%06u ", (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
@@ -96,8 +97,8 @@ extern __thread int ctracer_ret;
 #define trvp_(p) tracef(#p" = %016zX ", (size_t)p)
 #define trvdn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%d:%d,", i, (*((int *)d+i))); tracef(EOL); }
 #define trvxn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%04x,", (*((int *)d+i))); tracef(EOL); }
-#define trvdr(record) trvdn(&record, sizeof(record)/sizeof(int));
-#define trvxr(record) trvxn(&record, sizeof(record)/sizeof(int));
+#define trvdr(record) trvdn(&record, sizeof(record)/sizeof(int))
+#define trvxr(record) trvxn(&record, sizeof(record)/sizeof(int))
 
 /* trvdnz - TRace Digital Variable, if Not Zero */
 #define trvdnz(d) { if (d) tracef(#d " = %d" EOL, (int)d); }
@@ -159,7 +160,8 @@ if (!((i+1) % 64)) \
 #define chkne(a) \
 (/* tracef("calling  %s\n",#a), */ \
 	ctracer_ret = a,\
-	((ctracer_ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n", __file__, __LINE__, __func__, errno, strerror(errno), ctracer_ret, #a)\
+	((ctracer_ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n", __file__, __LINE__, __func__, \
+				    errno, strerror(errno), ctracer_ret, #a)\
 	 : 0), ctracer_ret)
 
 #define chkn2(a) \
@@ -201,7 +203,7 @@ extern int free_pages_prev;
 extern zone_t *zone_table[MAX_NR_ZONES*MAX_NR_NODES]; \
 int mem_change = zone_table[0]->free_pages - free_pages_prev; \
 if (mem_change) { \
-	trl_(); trvi_(mem_change); trvi(zone_table[0]->free_pages); } \
+	trl_(); trvi_(mem_change); trvd(zone_table[0]->free_pages); } \
 	free_pages_prev = zone_table[0]->free_pages; \
 } while (0)
 #endif
