@@ -8,11 +8,11 @@ make -B ctracer-test && ./ctracer-test
 
 - Test as kernel module:
 
-KERNELDIR=/lib/modules/$(uname -r)/build; \
-make -B -C ${KERNELDIR} M=$PWD modules obj-m=ctracer-test.o; \
-sudo insmod ./ctracer-test.ko; \
-sudo rmmod ctracer-test; \
-dmesg
+{ KERNELDIR=/lib/modules/$(uname -r)/build;
+  make -B -C ${KERNELDIR} M=$PWD modules obj-m=ctracer-test.o;
+  sudo insmod ./ctracer-test.ko;
+  sudo rmmod ctracer-test;
+  dmesg; }
 
  */
 
