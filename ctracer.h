@@ -84,8 +84,8 @@ extern __thread int ctracer_ret;
 #define trv_(t, v) tracef(#v " = %" t " ", v)
 #define trvd(d) tracef(#d " = %ld" EOL, (long int)(d))
 #define trvd_(d) tracef(#d " = %ld ", (long int)(d))
-#define trvx_(x) tracef(#x " = 0x%X ", (int)x)
-#define trvx(x) tracef(#x " = 0x%lX" EOL, (long int)x)
+#define trvx_(x) tracef(#x " = 0x%lx ", (long int)(x))
+#define trvx(x) tracef(#x " = 0x%lx" EOL, (long int)(x))
 #define trvlx(x) tracef(#x " = %#llx" EOL, (long long)(x))
 #define trvf(f) tracef(#f " = %f" EOL, f)
 #define trvf_(f) tracef(#f " = %f ", f)
@@ -93,10 +93,12 @@ extern __thread int ctracer_ret;
 #define trvtv(tv) tracef(#tv " = %u.%06u" EOL, (unsigned int)tv.tv_sec, (unsigned int)tv.tv_usec)
 #define trvs(s) tracef(#s " = \"%s\"" EOL, (char*)s)
 #define trvs_(s) tracef(#s" = \"%s\" ", s)
-#define trvp(p) tracef(#p " = %016zX" EOL, (size_t)p)
-#define trvp_(p) tracef(#p" = %016zX ", (size_t)p)
-#define trvdn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%d:%d,", i, (*((int *)d+i))); tracef(EOL); }
-#define trvxn(d, n) {int i; tracef("%s", #d"[]="); for (i = 0; i < n; i++) tracef("%04x,", (*((int *)d+i))); tracef(EOL); }
+#define trvp(p) tracef(#p " = %016zx" EOL, (size_t)p)
+#define trvp_(p) tracef(#p" = %016zx ", (size_t)p)
+#define trvdn(d, n) {int i; tracef("%s", #d"[]="); \
+	for (i = 0; i < n; i++) tracef("%d:%d,", i, (*((int *)d+i))); tracef(EOL); }
+#define trvxn(d, n) {int i; tracef("%s", #d"[]="); \
+	for (i = 0; i < n; i++) tracef("%04x,", (*((int *)d+i))); tracef(EOL); }
 #define trvdr(record) trvdn(&record, sizeof(record)/sizeof(int))
 #define trvxr(record) trvxn(&record, sizeof(record)/sizeof(int))
 
@@ -136,7 +138,7 @@ IFTRACE({ int i = 0; for (; i < (int)(N); i += sizeof(int)) \
 #define trace_mem_int(P, N) \
 IFTRACE({ int i = 0; for (; i < (int)(N) ; i += sizeof(int)) \
 { if (i && (!(i % 16))) tracef("%i:", i); \
-tracef("%X ", *(int *)((void *)(P)+i)); \
+tracef("%x ", *(int *)((void *)(P)+i)); \
 if (!((i+1) % 64)) \
 	tracef(EOL); \
 }; tracef(EOL); })
@@ -249,7 +251,7 @@ do {  \
 	static int num;			\
 	if (num < n) {		\
 		trl_();				\
-		tracef("#0x%X", (int)num);	\
+		tracef("#0x%x", (int)num);	\
 		args;				\
 		trln();			\
 	}	num++;				\
@@ -425,7 +427,7 @@ static inline int lookup_symbol_name(unsigned long addr, char *symbol)
 		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%s", w2 && *w2 ? w2 : w1);
 	}
 	else
-		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%lX", addr);
+		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%lx", addr);
 	free(strings);
 	return r;
 }
