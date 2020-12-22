@@ -50,7 +50,7 @@ extern __thread int ctracer_ret;
 
 #define multistatement(ms) ms /* trick to bypass checkpatch.pl error */
 
-#ifdef CTRACER_ON
+#ifndef CTRACER_OFF
 
 //#define _entry multistatement(trllog(); goto _entry; _entry)
 //#define _entry multistatement(_trace_enter(); goto _entry; _entry)
@@ -174,11 +174,7 @@ if (!((i+1) % 64)) \
 #endif
 
 
-#ifdef CTRACER_OFF		/* force no tracing */
-#undef CTRACER_ON
-#endif
-
-#ifdef CTRACER_ON
+#ifndef CTRACER_OFF
 #define IFTRACE(x) x
 
 #ifdef __KERNEL__
@@ -215,7 +211,7 @@ if (mem_change) { \
 #define tracef(fmt, args...) printk(fmt, ##args)
 
 #else /* !__KERNEL__ */
-/* CTRACER_ON and not __KERNEL__ */
+/* !CTRACER_OFF and not __KERNEL__ */
 #include <stdio.h>
 #define tracef(fmt, args...) ({ flockfile(stderr); fprintf(stderr, fmt, ##args); funlockfile(stderr);})
 
@@ -268,7 +264,7 @@ do {  \
 	}	num++;				\
 } while (0)
 
-#else /* !CTRACER_ON */
+#else /* CTRACER_OFF */
 #define trllog()
 
 static inline int empty_function(void)
@@ -398,7 +394,7 @@ static inline void stack_trace(void)
 
 extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
 
-#ifdef CTRACER_ON
+#ifndef CTRACER_OFF
 static inline void __on_cleanup(char *s[])
 {
 	if (*s) {
