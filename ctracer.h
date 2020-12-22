@@ -113,8 +113,8 @@ extern __thread int ctracer_ret;
 #define trl_() tracef("%s:%i %s ", __file__, __LINE__, __func__)
 #define trln() tracef(EOL)
 
-#define trlvd(d) tracef("%s:%d %s %s=%ld\n",__file__,__LINE__,__func__,#d,(long int)(d))
-#define trlvx(x) tracef("%s:%d %s %s=0x%lX\n",__file__,__LINE__,__func__,#x,(long int)(x))
+#define trlvd(d) tracef("%s:%d: %s %s=%ld\n", __file__, __LINE__, __func__, #d, (long)(d))
+#define trlvx(x) tracef("%s:%d: %s %s=0x%lx\n", __file__, __LINE__, __func__, #x, (long)(x))
 
 #define trl_in() do_statement(trace_time(); trlm("{");)
 #define trl_out() do_statement(trace_time(); trlm("}");)
