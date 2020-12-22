@@ -246,17 +246,6 @@ do {  \
 	}	num++;				\
 } while (0)
 
-#define trlnum(n, args ...) \
-do {  \
-	static int num;			\
-	if (num < n) {		\
-		trl_();				\
-		tracef("#0x%x", (int)num);	\
-		args;				\
-		trln();			\
-	}	num++;				\
-} while (0)
-
 #define trleach(n, args ...) \
 do {  \
 	static int num;			\
