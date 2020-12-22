@@ -289,7 +289,7 @@ static inline int empty_function(void)
 #if 1
 /* omit full absolute path for modules */
 #ifdef __GNUG__
-//#include <string.h>
+#include <cstring>
 #else
 extern char *strrchr(const char *s, int c);
 #endif
@@ -325,7 +325,7 @@ static void *malloc_trace;
 #ifndef trace_time_defined
 #define trace_time_defined
 
-void trace_time();
+void trace_time(void);
 /*
 extern double time_prev_f;
 void static inline trace_time()
@@ -449,7 +449,7 @@ int lookup_symbol_name(unsigned long addr, char *symbol)
 	{ char _caller[_CTRACRE_BUF_LEN]; \
 	lookup_symbol_name((unsigned long)__builtin_return_address(0), _caller); \
 	if (_trace_enter_num < 100) { \
-		_ret_msg = malloc(_CTRACRE_BUF_LEN); \
+		_ret_msg = (char*)malloc(_CTRACRE_BUF_LEN); \
 		if (_ret_msg) snprintf(_ret_msg, _CTRACRE_BUF_LEN, "%s < %s }", _caller, __func__);  \
 		tracef("%s > %s { @ %s:%d #%d" EOL, _caller, __func__,  __file__, __LINE__, _trace_enter_num); \
 	} }
