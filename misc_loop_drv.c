@@ -45,7 +45,7 @@
 /*
  * It's supposed you computer doesn't use floppy device.
  * This drivers uses IRQ and port of floppy device for demonstration.
-*/
+ */
 
 static int port = 0x3f4;
 module_param(port, int, 0);
@@ -108,8 +108,8 @@ static void misc_loop_drv_tasklet_func(unsigned long d)
 	struct misc_loop_drv_data *drvdata = (void *)d;
 
 	while (!ioread8(drvdata->port_ptr + MISC_DRV_TX_FULL)
-			&& kfifo_out_spinlocked(&drvdata->out_fifo,
-			&data_out, sizeof(data_out), &drvdata->fifo_lock)) {
+	       && kfifo_out_spinlocked(&drvdata->out_fifo,
+				       &data_out, sizeof(data_out), &drvdata->fifo_lock)) {
 		wake_up_interruptible(&drvdata->writeable);
 		pr_debug("data_out=%d %c\n", data_out, data_out >= 32 ? data_out : ' ');
 		iowrite8(data_out, drvdata->port_ptr + MISC_DRV_TX);
@@ -127,7 +127,7 @@ static void misc_loop_drv_tasklet_func(unsigned long d)
 		data_in = ioread8(drvdata->port_ptr + MISC_DRV_RX);
 		pr_debug("data_in=%d %c\n", data_in, data_in >= 32 ? data_in : ' ');
 		kfifo_in_spinlocked(&drvdata->in_fifo, &data_in,
-			sizeof(data_in), &drvdata->fifo_lock);
+				    sizeof(data_in), &drvdata->fifo_lock);
 		wake_up_interruptible(&drvdata->readable);
 		/* clear rx ready flag and implicitly tx full flag */
 		iowrite8(0, drvdata->port_ptr + MISC_DRV_RX_READY);
@@ -159,7 +159,7 @@ static int misc_loop_drv_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t misc_loop_drv_read(struct file *file, char __user *buf,
-		size_t count, loff_t *ppos)
+				  size_t count, loff_t *ppos)
 {
 	int ret = 0;
 	unsigned int copied;
@@ -171,7 +171,7 @@ static ssize_t misc_loop_drv_read(struct file *file, char __user *buf,
 		} else {
 			pr_debug("%s\n", "waiting");
 			ret = wait_event_interruptible(drvdata->readable,
-					!kfifo_is_empty(&drvdata->in_fifo));
+						       !kfifo_is_empty(&drvdata->in_fifo));
 			if (ret == -ERESTARTSYS) {
 				pr_err("interrupted\n");
 				return -EINTR;
@@ -187,7 +187,7 @@ static ssize_t misc_loop_drv_read(struct file *file, char __user *buf,
 }
 
 static ssize_t misc_loop_drv_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *ppos)
+				   size_t count, loff_t *ppos)
 {
 	int ret;
 	unsigned int copied;
@@ -198,7 +198,7 @@ static ssize_t misc_loop_drv_write(struct file *file, const char __user *buf,
 			return -EAGAIN;
 		} else {
 			ret = wait_event_interruptible(drvdata->writeable,
-					!kfifo_is_full(&drvdata->out_fifo));
+						       !kfifo_is_full(&drvdata->out_fifo));
 			if (ret == -ERESTARTSYS) {
 				pr_err("interrupted\n");
 				return -EINTR;
@@ -223,12 +223,12 @@ static unsigned int misc_loop_drv_poll(struct file *file, poll_table *pt)
 	if (!kfifo_is_empty(&drvdata->in_fifo))
 		mask |= POLLIN | POLLRDNORM;
 	mask |= POLLOUT | POLLWRNORM;
-/*
-	if case of output end of file set
-	mask |= POLLHUP;
-	in case of output error set
-	mask |= POLLERR;
-*/
+	/*
+	   if case of output end of file set
+	   mask |= POLLHUP;
+	   in case of output error set
+	   mask |= POLLERR;
+	 */
 	return mask;
 }
 
@@ -280,7 +280,7 @@ static struct misc_loop_drv_data *misc_loop_drv_data_init(void)
 	mutex_init(&drvdata->read_lock);
 	mutex_init(&drvdata->write_lock);
 	tasklet_init(&drvdata->misc_loop_drv_tasklet,
-			misc_loop_drv_tasklet_func, (unsigned long)drvdata);
+		     misc_loop_drv_tasklet_func, (unsigned long)drvdata);
 	return drvdata;
 }
 
@@ -306,7 +306,7 @@ static int misc_loop_drv_init(void)
 	   Real I/O port should be mapped with function with ioport_map:
 	   drvdata->port_ptr = ioport_map(port, port_size);
 	   But, because we work in emulation mode, we use array instead mapped ports
-	*/
+	 */
 	drvdata->port_ptr = (void __iomem *) port_emulation;
 	if (!drvdata->port_ptr) {
 		pr_err("ioport_map failed\n");

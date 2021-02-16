@@ -112,7 +112,7 @@ static struct ldt_data *drvdata;
 static void ldt_received(char data)
 {
 	kfifo_in_spinlocked(&drvdata->in_fifo, &data,
-			sizeof(data), &drvdata->fifo_lock);
+			    sizeof(data), &drvdata->fifo_lock);
 	wake_up_interruptible(&drvdata->readable);
 }
 
@@ -153,8 +153,8 @@ static void ldt_tasklet_func(unsigned long d)
 
 	if (drvdata->uart_detected) {
 		while (tx_ready() && kfifo_out_spinlocked(&drvdata->out_fifo,
-					&data_out, sizeof(data_out),
-					&drvdata->fifo_lock)) {
+							  &data_out, sizeof(data_out),
+							  &drvdata->fifo_lock)) {
 			wake_up_interruptible(&drvdata->writeable);
 			pr_debug("data_out=%d %c\n", data_out, data_out >= 32 ? data_out : ' ');
 			ldt_send(data_out);
@@ -167,8 +167,8 @@ static void ldt_tasklet_func(unsigned long d)
 		}
 	} else {
 		while (kfifo_out_spinlocked(&drvdata->out_fifo,
-					&data_out, sizeof(data_out),
-					&drvdata->fifo_lock)) {
+					    &data_out, sizeof(data_out),
+					    &drvdata->fifo_lock)) {
 			wake_up_interruptible(&drvdata->writeable);
 			pr_debug("data_out=%d\n", data_out);
 			ldt_send(data_out);
@@ -256,7 +256,7 @@ static int ldt_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t ldt_read(struct file *file, char __user *buf,
-		size_t count, loff_t *ppos)
+			size_t count, loff_t *ppos)
 {
 	int ret = 0;
 	unsigned int copied;
@@ -268,7 +268,7 @@ static ssize_t ldt_read(struct file *file, char __user *buf,
 		} else {
 			pr_debug("waiting\n");
 			ret = wait_event_interruptible(drvdata->readable,
-					!kfifo_is_empty(&drvdata->in_fifo));
+						       !kfifo_is_empty(&drvdata->in_fifo));
 			if (ret == -ERESTARTSYS) {
 				pr_err("%s\n", "interrupted");
 				return -EINTR;
@@ -283,7 +283,7 @@ static ssize_t ldt_read(struct file *file, char __user *buf,
 }
 
 static ssize_t ldt_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *ppos)
+			 size_t count, loff_t *ppos)
 {
 	int ret;
 	unsigned int copied;
@@ -294,7 +294,7 @@ static ssize_t ldt_write(struct file *file, const char __user *buf,
 			return -EAGAIN;
 		} else {
 			ret = wait_event_interruptible(drvdata->writeable,
-					!kfifo_is_full(&drvdata->out_fifo));
+						       !kfifo_is_full(&drvdata->out_fifo));
 			if (ret == -ERESTARTSYS) {
 				pr_err("%s\n", "interrupted");
 				return -EINTR;
@@ -318,12 +318,12 @@ static unsigned int ldt_poll(struct file *file, poll_table *pt)
 	if (!kfifo_is_empty(&drvdata->in_fifo))
 		mask |= POLLIN | POLLRDNORM;
 	mask |= POLLOUT | POLLWRNORM;
-/*
-	if case of output end of file set
-	mask |= POLLHUP;
-	in case of output error set
-	mask |= POLLERR;
-*/
+	/*
+	   if case of output end of file set
+	   mask |= POLLHUP;
+	   in case of output error set
+	   mask |= POLLERR;
+	 */
 	return mask;
 }
 
@@ -362,9 +362,9 @@ static int ldt_mmap(struct file *filp, struct vm_area_struct *vma)
 }
 
 #define trace_ioctl(nr) pr_debug("ioctl=(%c%c %c #%i %i)\n", \
-	(_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', \
-	(_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
-	_IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
+				 (_IOC_READ & _IOC_DIR(nr)) ? 'r' : ' ', \
+				 (_IOC_WRITE & _IOC_DIR(nr)) ? 'w' : ' ', \
+				 _IOC_TYPE(nr), _IOC_NR(nr), _IOC_SIZE(nr))
 
 static DEFINE_MUTEX(ioctl_lock);
 
@@ -385,7 +385,7 @@ static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 		case 0:
 			if (_IOC_DIR(cmnd) == _IOC_WRITE) {
 				if (copy_from_user(drvdata->in_buf, user,
-							_IOC_SIZE(cmnd))) {
+						   _IOC_SIZE(cmnd))) {
 					ret = -EFAULT;
 					goto exit;
 				}
@@ -395,7 +395,7 @@ static long ldt_ioctl(struct file *f, unsigned int cmnd, unsigned long arg)
 			}
 			if (_IOC_DIR(cmnd) == _IOC_READ) {
 				if (copy_to_user(user, drvdata->out_buf,
-							_IOC_SIZE(cmnd))) {
+						 _IOC_SIZE(cmnd))) {
 					ret = -EFAULT;
 					goto exit;
 				}
@@ -464,27 +464,27 @@ static int uart_probe(void)
 	 *	full UART driver drivers/tty/serial/8250/8250.c
 	 */
 	ret = request_irq(irq, ldt_isr,
-			IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
+			  IRQF_SHARED, KBUILD_MODNAME, THIS_MODULE);
 	if (ret < 0) {
 		pr_err("%s\n", "request_irq failed");
 		return ret;
 	}
 	iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP,
-			drvdata->port_ptr + UART_MCR);
+		 drvdata->port_ptr + UART_MCR);
 	drvdata->uart_detected = (ioread8(drvdata->port_ptr + UART_MSR) & 0xF0)
 		== (UART_MSR_DCD | UART_MSR_CTS);
 
 	if (drvdata->uart_detected) {
 		iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI,
-				drvdata->port_ptr + UART_IER);
+			 drvdata->port_ptr + UART_IER);
 		iowrite8(UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2,
-				drvdata->port_ptr + UART_MCR);
+			 drvdata->port_ptr + UART_MCR);
 		iowrite8(UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
-				drvdata->port_ptr + UART_FCR);
+			 drvdata->port_ptr + UART_FCR);
 		pr_debug("loopback=%d\n", loopback);
 		if (loopback)
 			iowrite8(ioread8(drvdata->port_ptr + UART_MCR) | UART_MCR_LOOP,
-					drvdata->port_ptr + UART_MCR);
+				 drvdata->port_ptr + UART_MCR);
 	}
 	if (!drvdata->uart_detected && loopback)
 		pr_warn("Emulating loopback in software\n");

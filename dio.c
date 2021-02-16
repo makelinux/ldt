@@ -56,7 +56,7 @@ static int ro, wo; /* read only, write only*/
 
 /*
 #define VERBOSE
-*/
+ */
 
 int output(int dev, void *buf, int size)
 {
@@ -75,7 +75,7 @@ _entry:
 		break;
 	case ioctl_io:
 		ioctl(dev, _IOC(_IOC_WRITE, ioctl_type, ioctl_num,
-					size & _IOC_SIZEMASK), buf);
+				size & _IOC_SIZEMASK), buf);
 		break;
 	case file_io:
 	default:
@@ -101,7 +101,7 @@ _entry:
 		break;
 	case ioctl_io:
 		ioctl(dev, _IOC(_IOC_READ, ioctl_type, ioctl_num,
-					size & _IOC_SIZEMASK), buf);
+				size & _IOC_SIZEMASK), buf);
 		ret = size;
 		break;
 	case file_io:
@@ -145,7 +145,7 @@ int io_start(int dev)
 			trvd_(data_in_len);
 			trln();
 #endif
-again:
+		again:
 			chkne(ret = output(dev, inbuf, data_in_len));
 			if (ret < 0 && errno == EAGAIN) {
 				usleep(100000);
@@ -252,9 +252,9 @@ int expand_arg(char *arg)
 {
 	if (!arg)
 		return 0;
-/*
-	return_if_arg_is_equal(SOCK_STREAM);
-*/
+	/*
+	   return_if_arg_is_equal(SOCK_STREAM);
+	 */
 	return strtol(arg, NULL, 0);
 }
 
@@ -320,7 +320,7 @@ int main(int argc, char *argv[])
 	chkne(dev = open(dev_name, O_CREAT | O_RDWR, 0666));
 	if (io_type == mmap_io) {
 		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
-				MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE)-1));
+			  MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE)-1));
 		if (mm == MAP_FAILED) {
 			warn("mmap() failed");
 			goto exit;

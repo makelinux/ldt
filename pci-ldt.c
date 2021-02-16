@@ -73,8 +73,8 @@ static irqreturn_t pci_ldt_irq(int irq, struct instance_data *d)
 static irqreturn_t pci_ldt_th(int irq, struct instance_data *d)
 {
 	/* TODO: process interrupt
-	return IRQ_HANDLED;
-	*/
+	   return IRQ_HANDLED;
+	 */
 	++irqs;
 	return IRQ_NONE;
 }
@@ -134,7 +134,7 @@ static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 		data->base = pcim_iomap_table(pcid)[bar];
 		trvp(data->base);
 		print_hex_dump(KERN_DEBUG, "regs:", DUMP_PREFIX_OFFSET,
-                               16, 2, data->base, 64, 0);
+			       16, 2, data->base, 64, 0);
 	}
 
 	return 0;
