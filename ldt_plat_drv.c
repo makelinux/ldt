@@ -113,11 +113,11 @@ static const struct dev_pm_ops ldt_pm = {
 
 static struct platform_driver ldt_plat_driver = {
 	.driver = {
-		   .name	= "ldt_device_name",
-		   .owner	= THIS_MODULE,
-		   .pm		= ldt_pm_ops,
-		   .of_match_table = of_match_ptr(ldt_of_match),
-		   },
+		.name	= "ldt_device_name",
+		.owner	= THIS_MODULE,
+		.pm		= ldt_pm_ops,
+		.of_match_table = of_match_ptr(ldt_of_match),
+	},
 	.probe = ldt_plat_probe,
 	.remove = ldt_plat_remove,
 

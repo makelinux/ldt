@@ -123,7 +123,7 @@ static void misc_loop_drv_tasklet_func(unsigned long d)
 		 */
 		apic->send_IPI_all(ISA_IRQ_VECTOR(irq));
 	}
-	while ( ioread8(drvdata->port_ptr + MISC_DRV_RX_READY)) {
+	while (ioread8(drvdata->port_ptr + MISC_DRV_RX_READY)) {
 		data_in = ioread8(drvdata->port_ptr + MISC_DRV_RX);
 		pr_debug("data_in=%d %c\n", data_in, data_in >= 32 ? data_in : ' ');
 		kfifo_in_spinlocked(&drvdata->in_fifo, &data_in,

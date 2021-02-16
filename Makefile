@@ -49,3 +49,8 @@ checkpatch:
 
 checkpatch2:
 	checkpatch.pl --no-tree --show-types --ignore LONG_LINE,LINE_CONTINUATIONS --terse -f $(_src) Makefile
+
+astyle:
+	astyle --style=linux --lineend=linux --indent=force-tab=8 \
+		--pad-comma --pad-header --pad-oper --keep-one-line-blocks --unpad-paren \
+		--attach-inlines --indent-labels --max-continuation-indent=80 $(_src)

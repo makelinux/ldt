@@ -235,7 +235,8 @@ if (mem_change) { \
 
 #ifndef _hweight32
 static inline unsigned int _hweight32(unsigned int w)
-{	/* from kernel */
+{
+	/* from kernel */
 	w -= (w >> 1) & 0x55555555;
 	w = (w & 0x33333333) + ((w >> 2) & 0x33333333);
 	w = (w + (w >> 4)) & 0x0f0f0f0f;
@@ -411,17 +412,17 @@ static inline void __on_cleanup(char *s[])
 #if defined(__KERNEL__) && !defined(MODULE)
 char *strsep(char **stringp, const char *delim);
 static inline int lookup_symbol_name(unsigned long addr, char *symbol)
-{ char **strings;
+{
+	char **strings;
 	strings = backtrace_symbols((void * const*)&addr, 1);
 	int r;
 	if (strings && strings[0]) {
 
 		char *s = strings[0];
-		char *w1 = strsep(&s," (+)");
-		char *w2 = strsep(&s," (+)");
+		char *w1 = strsep(&s, " (+)");
+		char *w2 = strsep(&s, " (+)");
 		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%s", w2 && *w2 ? w2 : w1);
-	}
-	else
+	} else
 		r = snprintf(symbol, _CTRACRE_BUF_LEN, "%lx", addr);
 	free(strings);
 	return r;
@@ -432,7 +433,7 @@ static inline int lookup_symbol_name(unsigned long addr, char *symbol)
  */
 int lookup_symbol_name(unsigned long addr, char *symbol)
 {
-	 return snprintf(symbol, _CTRACRE_BUF_LEN, "%016lX", addr);
+	return snprintf(symbol, _CTRACRE_BUF_LEN, "%016lX", addr);
 }
 #endif
 #if defined(__KERNEL__)

@@ -320,12 +320,12 @@ int main(int argc, char *argv[])
 	chkne(dev = open(dev_name, O_CREAT | O_RDWR, 0666));
 	if (io_type == mmap_io) {
 		mm = mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
-			  MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE)-1));
+			  MAP_SHARED, dev, offset & ~(sysconf(_SC_PAGESIZE) - 1));
 		if (mm == MAP_FAILED) {
 			warn("mmap() failed");
 			goto exit;
 		}
-		mem = mm + (offset & (sysconf(_SC_PAGESIZE)-1));
+		mem = mm + (offset & (sysconf(_SC_PAGESIZE) - 1));
 	}
 	if (verbose) {
 		trvs_(dev_name);

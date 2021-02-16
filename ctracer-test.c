@@ -36,7 +36,7 @@ int sub(void)
 int main(void)
 {	_entry:;
 	int i;
-	for (i=0; i < 10; i++)
+	for (i = 0; i < 10; i++)
 		sub();
 	trl();
 	trvp(i);

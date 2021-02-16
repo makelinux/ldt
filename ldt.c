@@ -125,9 +125,8 @@ static void ldt_send(char data)
 {
 	if (drvdata->uart_detected)
 		iowrite8(data, drvdata->port_ptr + UART_TX);
-	else
-		if (loopback)
-			ldt_received(data);
+	else if (loopback)
+		ldt_received(data);
 }
 
 static inline u8 tx_ready(void)
@@ -472,7 +471,7 @@ static int uart_probe(void)
 	iowrite8(UART_MCR_RTS | UART_MCR_OUT2 | UART_MCR_LOOP,
 		 drvdata->port_ptr + UART_MCR);
 	drvdata->uart_detected = (ioread8(drvdata->port_ptr + UART_MSR) & 0xF0)
-		== (UART_MSR_DCD | UART_MSR_CTS);
+				 == (UART_MSR_DCD | UART_MSR_CTS);
 
 	if (drvdata->uart_detected) {
 		iowrite8(UART_IER_RDI | UART_IER_RLSI | UART_IER_THRI,
