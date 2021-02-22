@@ -84,7 +84,7 @@ extern __thread int ctracer_ret;
 	v<letter> = printf Variable in specified format (d, x, f, s, etc)
 */
 
-#define trla(fmt, args...) tracef("%s:%i %s " fmt, __file__, __LINE__, __func__, ## args)
+#define trla(fmt, args...) tracef("%s:%i: %s " fmt, __file__, __LINE__, __func__, ## args)
 #define trv(t, v) tracef(#v " = %" t EOL, v)
 #define trv_(t, v) tracef(#v " = %" t " ", v)
 #define trvd(d) tracef(#d " = %ld" EOL, (long int)(d))
@@ -108,14 +108,14 @@ extern __thread int ctracer_ret;
 #define trvxr(record) trvxn(&record, sizeof(record)/sizeof(int))
 
 /* trvdnz - TRace Digital Variable, if Not Zero */
-#define trvdnz(d) { if (d) tracef(#d " = %d" EOL, (int)d); }
+#define trvdnz(d) { if (d) tracef(#d " = %d" EOL, (int)(d)); }
 #define trace_call(a) do { trla("calling %s {\n", #a); a; tracef("} done\n"); } while (0)
 
 /* trlm - TRace Location, with Message */
-#define trlm(m) tracef("%s:%i %s %s" EOL, __file__, __LINE__, __func__, m)
-#define trlm_(m) tracef("%s:%i %s %s ", __file__, __LINE__, __func__, m)
+#define trlm(m) tracef("%s:%i: %s %s" EOL, __file__, __LINE__, __func__, m)
+#define trlm_(m) tracef("%s:%i: %s %s ", __file__, __LINE__, __func__, m)
 #define trl() do { trace_time(); trlm(""); } while (0)
-#define trl_() tracef("%s:%i %s ", __file__, __LINE__, __func__)
+#define trl_() tracef("%s:%i: %s ", __file__, __LINE__, __func__)
 #define trln() tracef(EOL)
 
 #define trlvd(d) tracef("%s:%d: %s %s=%ld\n", __file__, __LINE__, __func__, #d, (long)(d))
@@ -161,13 +161,13 @@ if (!((i+1) % 64)) \
 
 #define chkn(a) \
 (ctracer_ret = a,\
-	((ctracer_ret < 0) ? tracef("%s:%i %s FAIL\n\t%i=%s\n", __file__, __LINE__, __func__, ctracer_ret, #a)\
+	((ctracer_ret < 0) ? tracef("%s:%i: %s FAIL\n\t%i=%s\n", __file__, __LINE__, __func__, ctracer_ret, #a)\
 	 : 0), ctracer_ret)
 
 #define chkne(a) \
 (/* tracef("calling  %s\n",#a), */ \
 	ctracer_ret = a,\
-	((ctracer_ret < 0) ? tracef("%s:%i %s FAIL errno = %i \"%s\" %i = %s\n", __file__, __LINE__, __func__, \
+	((ctracer_ret < 0) ? tracef("%s:%i: %s FAIL errno = %i \"%s\" %i = %s\n", __file__, __LINE__, __func__, \
 				    errno, strerror(errno), ctracer_ret, #a)\
 	 : 0), ctracer_ret)
 
@@ -409,14 +409,19 @@ static inline void __on_cleanup(char *s[])
 
 #define _CTRACRE_BUF_LEN 200
 
-#if defined(__KERNEL__) && !defined(MODULE)
+#if defined(__GLIBC__)
+#ifndef strsep
 char *strsep(char **stringp, const char *delim);
+#endif
 static inline int lookup_symbol_name(unsigned long addr, char *symbol)
 {
 	char **strings;
 	strings = backtrace_symbols((void * const*)&addr, 1);
 	int r;
+	// printk("%pf", symbol);
 	if (strings && strings[0]) {
+		//char *s = strchr(strings[0],'(') + 1;
+		//if (s) s+=1; else
 
 		char *s = strings[0];
 		char *w1 = strsep(&s, " (+)");
@@ -427,11 +432,12 @@ static inline int lookup_symbol_name(unsigned long addr, char *symbol)
 	free(strings);
 	return r;
 }
-#else
+#endif
+#if defined(MODULE)
 /*	func lookup_symbol_name is defined in the kernel but is not
 	exported to be used in modules
  */
-int lookup_symbol_name(unsigned long addr, char *symbol)
+static inline int lookup_symbol_name(unsigned long addr, char *symbol)
 {
 	return snprintf(symbol, _CTRACRE_BUF_LEN, "%016lX", addr);
 }
