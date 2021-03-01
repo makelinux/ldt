@@ -2,7 +2,6 @@
 ccflags-y+=-DDEBUG
 ccflags-y+=-DUSE_PLATFORM_DEVICE
 ccflags-y+=-fmax-errors=5
-#ccflags-y+=-DCTRACER_ON -include $M/ctracer.h
 #ccflags-y+=-D USE_MISCDEV # uncomment to use single misc device instead char devices region
 
 obj-m+= misc_loop_drv.o
@@ -13,6 +12,8 @@ obj-m+= ldt_plat_dev.o # implements platform_device and resource
 obj-m+= kthread_sample.o
 obj-m+= pci-ldt.o
 
+export CPATH:=${PWD}/lib
+
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
 all:	modules dio
@@ -20,11 +21,6 @@ all:	modules dio
 check:
 	./ldt-test
 
-ctracer-check:
-	$(MAKE) -B ctracer-test && ./ctracer-test
-	KERNELDIR=/lib/modules/$(uname -r)/build; make -B -C ${KERNELDIR} M=$$PWD modules obj-m=ctracer-test.o && \
-		  sudo insmod ./ctracer-test.ko && sudo rmmod ctracer-test && dmesg;
-	$(MAKE) -B ctracer-testpp && ./ctracer-testpp
 
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$$PWD modules
