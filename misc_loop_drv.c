@@ -38,6 +38,7 @@
 #include <linux/miscdevice.h>
 #include <linux/serial_reg.h>
 #include <linux/cdev.h>
+#include <asm/apic.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt)  "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
