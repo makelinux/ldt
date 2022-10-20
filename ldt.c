@@ -146,7 +146,11 @@ static inline u8 rx_ready(void)
  */
 
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+static void ldt_tasklet_func(struct tasklet_struct *t)
+#else
 static void ldt_tasklet_func(unsigned long d)
+#endif
 {
 	char data_out;
 
@@ -175,7 +179,11 @@ static void ldt_tasklet_func(unsigned long d)
 	}
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+static DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func);
+#else
 static DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
+#endif
 
 /*
  *	interrupt section
