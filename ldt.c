@@ -49,7 +49,7 @@
 #include <linux/version.h>
 
 #undef pr_fmt
-#define pr_fmt(fmt)    "%s.c:%d %s " fmt, KBUILD_MODNAME, __LINE__, __func__
+#define pr_fmt(fmt)    "%s:%d: %s " fmt, __FILE__, __LINE__, __func__
 
 static int port = 0x3f8;
 module_param(port, int, 0);
