@@ -8,7 +8,7 @@ module, platform driver, file operations (read/write, mmap, ioctl, blocking and 
 
 Just run
 
-git clone git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test && sudo ./misc_loop_drv_test
+git clone --recurse-submodules git://github.com/makelinux/ldt.git && cd ldt && make && ./ldt-test && sudo ./misc_loop_drv_test
 
 and explore sources.
 
