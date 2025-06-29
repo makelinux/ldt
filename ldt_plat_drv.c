@@ -71,10 +71,10 @@ _entry:
 	return 0;
 }
 
-static int ldt_plat_remove(struct platform_device *pdev)
+static void ldt_plat_remove(struct platform_device *pdev)
 {
 _entry:
-	return 0;
+	return;
 }
 
 /*
