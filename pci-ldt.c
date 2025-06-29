@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0
-
 #include <linux/module.h>
 
 MODULE_DESCRIPTION("PCI Linux Driver Template");
@@ -38,8 +37,8 @@ MODULE_LICENSE("GPL v2");
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
 #include <linux/msi.h>
+#include <linux/aer.h>
 
-#define CTRACER_ON
 #include "ctracer.h"
 
 #undef pr_fmt
@@ -100,6 +99,7 @@ static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 		dev_err(&pcid->dev, "pci_enable_device_mem %d\n", ret);
 		goto error;
 	}
+	trlvd(pcid->is_physfn);
 	ret = pcim_iomap_regions(pcid, pci_select_bars(pcid, IORESOURCE_MEM), pci_name(pcid));
 	if (ret) {
 		dev_err(&pcid->dev, "pcim_iomap_regions %d\n", ret);
@@ -125,6 +125,7 @@ static int pci_ldt_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 		goto error;
 	}
 
+	pci_set_master(pcid);
 
 	dev_notice(&pcid->dev, "Added %04X:%04X\n", pcid->vendor, pcid->device);
 	pci_read_config_word(pcid, PCI_STATUS, &status);
