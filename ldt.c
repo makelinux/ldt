@@ -481,7 +481,7 @@ static void ldt_cleanup(void)
 	debugfs_remove(debugfs);
 	if (ldt_miscdev.this_device)
 		misc_deregister(&ldt_miscdev);
-	del_timer(&ldt_timer);
+	timer_delete(&ldt_timer);
 	if (irq) {
 		if (drvdata->uart_detected) {
 			iowrite8(0, drvdata->port_ptr + UART_IER);
