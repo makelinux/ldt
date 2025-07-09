@@ -146,11 +146,7 @@ static inline u8 rx_ready(void)
  */
 
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
 static void ldt_tasklet_func(struct tasklet_struct *t)
-#else
-static void ldt_tasklet_func(unsigned long d)
-#endif
 {
 	char data_out;
 
@@ -179,11 +175,7 @@ static void ldt_tasklet_func(unsigned long d)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
 static DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func);
-#else
-static DECLARE_TASKLET(ldt_tasklet, ldt_tasklet_func, 0);
-#endif
 
 /*
  *	interrupt section
@@ -208,8 +200,6 @@ static irqreturn_t ldt_isr(int irq, void *dev_id)
  *	timer section
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
-
 static void ldt_timer_func(struct timer_list *ldt_timer)
 {
 	/*
@@ -222,25 +212,6 @@ static void ldt_timer_func(struct timer_list *ldt_timer)
 }
 
 static DEFINE_TIMER(ldt_timer, ldt_timer_func);
-
-#else
-
-static struct timer_list ldt_timer;
-
-static void ldt_timer_func(unsigned long data)
-{
-	/*
-	 *      this timer is used just to fire ldt_tasklet,
-	 *      because there is no interrupts in loopback mode
-	 */
-	if (loopback)
-		tasklet_schedule(&ldt_tasklet);
-	mod_timer(&ldt_timer, jiffies + HZ / 100);
-}
-
-static DEFINE_TIMER(ldt_timer, ldt_timer_func, 0, 0);
-
-#endif
 
 /*
  *	file_operations section
